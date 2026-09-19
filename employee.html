@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Task Manager — Employee</title>
+
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    />
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="employee.css" />
+  </head>
+
+  <body>
+    <!-- ======================================================
+         APP
+    ======================================================= -->
+
+    <div class="app">
+      <!-- ==================================================
+             SIDEBAR
+        =================================================== -->
+
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-icon">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+
+          <div>
+            <h2>TaskFlow</h2>
+            <span>Employee</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <button class="nav-item active" data-section="dashboard">
+            <i class="fa-solid fa-grid-2"></i>
+            <span>Dashboard</span>
+          </button>
+
+          <button class="nav-item" data-section="tasks">
+            <i class="fa-solid fa-list-check"></i>
+            <span>My Tasks</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <button class="logout-button" id="logoutButton">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- ==================================================
+             MAIN
+        =================================================== -->
+
+      <main class="main">
+        <!-- ==============================================
+                 TOPBAR
+            =============================================== -->
+
+        <header class="topbar">
+          <div class="mobile-brand">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>TaskFlow</span>
+          </div>
+
+          <div class="topbar-actions">
+            <button class="icon-button" id="refreshButton" title="Refresh">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+
+            <div class="user-menu">
+              <div class="avatar" id="userAvatar">U</div>
+
+              <div class="user-info">
+                <strong id="userName"> Loading... </strong>
+
+                <span id="userEmail"> Loading... </span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- ==============================================
+                 CONTENT
+            =============================================== -->
+
+        <div class="content">
+          <!-- ==========================================
+                     DASHBOARD SECTION
+                =========================================== -->
+
+          <section class="page-section active" id="dashboardSection">
+            <div class="page-header">
+              <div>
+                <p class="eyebrow">Employee Dashboard</p>
+
+                <h1>
+                  Welcome back,
+                  <span id="welcomeName"> ... </span>
+                </h1>
+
+                <p class="page-description">
+                  Here's an overview of your assigned tasks.
+                </p>
+              </div>
+            </div>
+
+            <!-- Stats -->
+
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon total">
+                  <i class="fa-solid fa-list-check"></i>
+                </div>
+
+                <div class="stat-content">
+                  <span> All Tasks </span>
+
+                  <strong id="totalTasks"> 0 </strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon pending">
+                  <i class="fa-regular fa-clock"></i>
+                </div>
+
+                <div class="stat-content">
+                  <span> Pending </span>
+
+                  <strong id="pendingTasks"> 0 </strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon completed">
+                  <i class="fa-solid fa-check"></i>
+                </div>
+
+                <div class="stat-content">
+                  <span> Completed </span>
+
+                  <strong id="completedTasks"> 0 </strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon expired">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+
+                <div class="stat-content">
+                  <span> Expired </span>
+
+                  <strong id="expiredTasks"> 0 </strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Upcoming Tasks -->
+
+            <div class="section-card">
+              <div class="section-card-header">
+                <div>
+                  <h2>Upcoming Tasks</h2>
+
+                  <p>Your nearest assigned tasks.</p>
+                </div>
+
+                <button class="text-button" id="viewAllTasksButton">
+                  View all
+                  <i class="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+
+              <div class="task-list" id="upcomingTasks">
+                <div class="loading-state">
+                  <div class="spinner"></div>
+
+                  <span> Loading tasks... </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+                     TASKS SECTION
+                =========================================== -->
+
+          <section class="page-section" id="tasksSection">
+            <div class="page-header">
+              <div>
+                <p class="eyebrow">Tasks</p>
+
+                <h1>My Tasks</h1>
+
+                <p class="page-description">
+                  Manage all tasks assigned to you.
+                </p>
+              </div>
+            </div>
+
+            <!-- Filters -->
+
+            <div class="filters">
+              <button class="filter-button active" data-filter="all">
+                All
+              </button>
+
+              <button class="filter-button" data-filter="pending">
+                Pending
+              </button>
+
+              <button class="filter-button" data-filter="completed">
+                Completed
+              </button>
+
+              <button class="filter-button" data-filter="expired">
+                Expired
+              </button>
+            </div>
+
+            <!-- Task List -->
+
+            <div class="tasks-grid" id="allTasks">
+              <div class="loading-state">
+                <div class="spinner"></div>
+
+                <span> Loading tasks... </span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- ======================================================
+         TASK DETAILS MODAL
+    ======================================================= -->
+
+    <div class="modal-overlay" id="taskModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <span class="modal-label"> Task Details </span>
+
+            <h2 id="modalTaskTitle">Task</h2>
+          </div>
+
+          <button class="modal-close" id="closeModalButton">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="task-status-row">
+            <span> Status </span>
+
+            <span class="status-badge" id="modalTaskStatus"> Pending </span>
+          </div>
+
+          <div class="task-detail">
+            <span>
+              <i class="fa-regular fa-calendar"></i>
+              Scheduled
+            </span>
+
+            <strong id="modalScheduled"> — </strong>
+          </div>
+
+          <div class="task-detail">
+            <span>
+              <i class="fa-regular fa-clock"></i>
+              Deadline
+            </span>
+
+            <strong id="modalDeadline"> — </strong>
+          </div>
+
+          <div class="task-description" id="modalDescriptionContainer">
+            <span> Description </span>
+
+            <p id="modalDescription">—</p>
+          </div>
+
+          <div class="task-link-container" id="modalLinkContainer">
+            <a
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              id="modalTaskLink"
+              class="task-link"
+            >
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              Open Task Link
+            </a>
+          </div>
+
+          <div class="deadline-warning" id="deadlineWarning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+
+            <span> The deadline for this task has passed. </span>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="secondary-button" id="cancelModalButton">Close</button>
+
+          <button class="primary-button" id="completeTaskButton">
+            <i class="fa-solid fa-check"></i>
+            Mark as Completed
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================
+         TOAST
+    ======================================================= -->
+
+    <div class="toast" id="toast">
+      <div class="toast-icon">
+        <i class="fa-solid fa-check"></i>
+      </div>
+
+      <div>
+        <strong id="toastTitle"> Success </strong>
+
+        <p id="toastMessage">Operation completed.</p>
+      </div>
+
+      <button id="closeToast">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- ======================================================
+         JAVASCRIPT
+    ======================================================= -->
+
+    <script type="module" src="employee.js"></script>
+  </body>
+</html>
