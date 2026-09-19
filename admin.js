@@ -1,5 +1,5 @@
 // ============================================================
-// admin.js
+// TaskFlow Admin
 // ============================================================
 
 import {
@@ -8,11 +8,12 @@ import {
   getUser,
   getUsers,
   getAllTasks,
+  createUser,
+  updateUser,
   createTask,
   calculateTaskStatus,
   convertFirebaseDate,
-  createUser,
-  updateUser,
+  getReadableFirebaseError,
 } from "./firebase.js";
 
 // ============================================================
@@ -22,323 +23,16 @@ import {
 const state = {
   authUser: null,
   profile: null,
+
   users: [],
   tasks: [],
+
   taskFilter: "all",
   taskUserFilter: "all",
+
   loading: false,
-  loginVisible: false,
 };
 
-// ============================================================
-// LOGIN GATE
-// ============================================================
-
-function createAdminLoginScreen() {
-  if (document.getElementById("adminLoginGate")) {
-    return;
-  }
-
-  const gate = document.createElement("div");
-
-  gate.id = "adminLoginGate";
-
-  gate.innerHTML = `
-    <div style="
-      position:fixed;
-      inset:0;
-      z-index:99999;
-      background:#0b0d10;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:24px;
-      font-family:Arial,sans-serif;
-    ">
-
-      <div style="
-        width:100%;
-        max-width:420px;
-        background:#15181d;
-        border:1px solid rgba(255,255,255,.08);
-        border-radius:20px;
-        padding:32px;
-        box-shadow:0 25px 80px rgba(0,0,0,.45);
-      ">
-
-        <div style="
-          margin-bottom:28px;
-          text-align:center;
-        ">
-
-          <div style="
-            width:54px;
-            height:54px;
-            margin:0 auto 16px;
-            border-radius:16px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            background:#fff;
-            color:#111;
-            font-size:22px;
-            font-weight:700;
-          ">
-            A
-          </div>
-
-          <h1 style="
-            margin:0 0 8px;
-            color:#fff;
-            font-size:25px;
-          ">
-            Admin Login
-          </h1>
-
-          <p style="
-            margin:0;
-            color:#8e959f;
-            font-size:14px;
-          ">
-            Sign in to Tasks Center
-          </p>
-
-        </div>
-
-
-        <form id="adminLoginForm">
-
-          <div style="margin-bottom:16px">
-
-            <label style="
-              display:block;
-              color:#c8cdd4;
-              font-size:13px;
-              margin-bottom:8px;
-            ">
-              Email
-            </label>
-
-            <input
-              id="adminLoginEmail"
-              type="email"
-              autocomplete="username"
-              required
-              placeholder="admin@example.com"
-              style="
-                width:100%;
-                box-sizing:border-box;
-                padding:13px 14px;
-                border-radius:10px;
-                border:1px solid #2b3038;
-                background:#0f1115;
-                color:#fff;
-                outline:none;
-              "
-            />
-
-          </div>
-
-
-          <div style="margin-bottom:20px">
-
-            <label style="
-              display:block;
-              color:#c8cdd4;
-              font-size:13px;
-              margin-bottom:8px;
-            ">
-              Password
-            </label>
-
-            <input
-              id="adminLoginPassword"
-              type="password"
-              autocomplete="current-password"
-              required
-              placeholder="••••••••"
-              style="
-                width:100%;
-                box-sizing:border-box;
-                padding:13px 14px;
-                border-radius:10px;
-                border:1px solid #2b3038;
-                background:#0f1115;
-                color:#fff;
-                outline:none;
-              "
-            />
-
-          </div>
-
-
-          <div
-            id="adminLoginError"
-            style="
-              display:none;
-              margin-bottom:16px;
-              padding:12px;
-              border-radius:10px;
-              background:rgba(239,68,68,.1);
-              color:#f87171;
-              font-size:13px;
-            "
-          ></div>
-
-
-          <button
-            type="submit"
-            id="adminLoginButton"
-            style="
-              width:100%;
-              border:0;
-              border-radius:10px;
-              padding:13px;
-              background:#fff;
-              color:#111;
-              font-size:14px;
-              font-weight:700;
-              cursor:pointer;
-            "
-          >
-            Sign In
-          </button>
-
-        </form>
-
-      </div>
-
-    </div>
-  `;
-
-  document.body.appendChild(gate);
-
-  document
-    .getElementById("adminLoginForm")
-    .addEventListener("submit", handleAdminLogin);
-}
-
-async function handleAdminLogin(event) {
-  event.preventDefault();
-
-  const email = document.getElementById("adminLoginEmail").value.trim();
-
-  const password = document.getElementById("adminLoginPassword").value;
-
-  const button = document.getElementById("adminLoginButton");
-
-  const error = document.getElementById("adminLoginError");
-
-  error.style.display = "none";
-
-  button.disabled = true;
-
-  button.textContent = "Signing in...";
-
-  try {
-    const { login } = await import("./firebase.js");
-
-    await login(email, password);
-  } catch (err) {
-    console.error("Admin login error:", err);
-
-    error.textContent = getReadableError(err);
-
-    error.style.display = "block";
-
-    button.disabled = false;
-
-    button.textContent = "Sign In";
-  }
-}
-
-function hideAdminLoginScreen() {
-  const gate = document.getElementById("adminLoginGate");
-
-  if (gate) {
-    gate.remove();
-  }
-}
-
-// ============================================================
-// AUTH
-// ============================================================
-
-function listenToAuthentication() {
-  createAdminLoginScreen();
-
-  listenToAuthState(async (user) => {
-    if (!user) {
-      state.authUser = null;
-
-      state.profile = null;
-
-      state.loginVisible = true;
-
-      createAdminLoginScreen();
-
-      return;
-    }
-
-    state.authUser = user;
-
-    try {
-      await initializeAdmin(user.uid);
-    } catch (error) {
-      console.error("Admin auth initialization error:", error);
-    }
-  });
-}
-
-async function initializeAdmin(userId) {
-  try {
-    setLoading(true);
-
-    const profile = await getUser(userId);
-
-    if (!profile) {
-      showToast("Account Error", "Admin profile was not found.", "error");
-
-      await logoutUser();
-
-      return;
-    }
-
-    state.profile = profile;
-
-    if (profile.active === false) {
-      showToast("Account Disabled", "This account has been disabled.", "error");
-
-      await logoutUser();
-
-      return;
-    }
-
-    if (profile.role !== "admin") {
-      showToast(
-        "Access denied",
-        "This account is not an administrator.",
-        "error",
-      );
-
-      await logoutUser();
-
-      return;
-    }
-
-    hideAdminLoginScreen();
-
-    renderProfile();
-
-    await loadData();
-  } catch (error) {
-    console.error("Admin initialization error:", error);
-
-    showToast("Error", getReadableError(error), "error");
-  } finally {
-    setLoading(false);
-  }
-}
 // ============================================================
 // DOM
 // ============================================================
@@ -402,18 +96,15 @@ const el = {
 };
 
 // ============================================================
-// INITIALIZE
+// INIT
 // ============================================================
 
 document.addEventListener("DOMContentLoaded", initialize);
 
 function initialize() {
   setupNavigation();
-
   setupFilters();
-
   setupModals();
-
   setupActions();
 
   listenToAuthentication();
@@ -426,8 +117,7 @@ function initialize() {
 function listenToAuthentication() {
   listenToAuthState(async (user) => {
     if (!user) {
-      window.location.href = "login.html";
-
+      window.location.replace("login.html");
       return;
     }
 
@@ -444,16 +134,22 @@ async function initializeAdmin(userId) {
     const profile = await getUser(userId);
 
     if (!profile) {
-      showToast("Account Error", "Admin profile was not found.", "error");
+      await logoutUser();
+
+      window.location.replace("login.html");
 
       return;
     }
 
-    state.profile = profile;
+    if (profile.active === false) {
+      showToast("Account disabled", "Your account is disabled.", "error");
 
-    // Important:
-    // The role must be verified server-side
-    // through Firebase Security Rules as well.
+      await logoutUser();
+
+      window.location.replace("login.html");
+
+      return;
+    }
 
     if (profile.role !== "admin") {
       showToast(
@@ -463,11 +159,13 @@ async function initializeAdmin(userId) {
       );
 
       setTimeout(() => {
-        window.location.href = "employee.html";
-      }, 1500);
+        window.location.replace("employee.html");
+      }, 900);
 
       return;
     }
+
+    state.profile = profile;
 
     renderProfile();
 
@@ -475,7 +173,7 @@ async function initializeAdmin(userId) {
   } catch (error) {
     console.error("Admin initialization error:", error);
 
-    showToast("Error", getReadableError(error), "error");
+    showToast("Error", getReadableFirebaseError(error), "error");
   } finally {
     setLoading(false);
   }
@@ -516,16 +214,13 @@ async function loadData() {
     }));
 
     renderDashboard();
-
     renderTasks();
-
     renderUsers();
-
     populateUserSelects();
   } catch (error) {
     console.error("Load admin data error:", error);
 
-    showToast("Unable to load data", getReadableError(error), "error");
+    showToast("Unable to load data", getReadableFirebaseError(error), "error");
   } finally {
     setLoading(false);
   }
@@ -547,34 +242,24 @@ function renderDashboard() {
   el.expiredTasks.textContent = counts.expired;
 
   renderRecentTasks();
-
   renderTeamOverview();
 }
 
 function getTaskCounts() {
   const counts = {
     total: state.tasks.length,
-
     pending: 0,
-
     completed: 0,
-
     expired: 0,
   };
 
   state.tasks.forEach((task) => {
-    switch (task.calculatedStatus) {
-      case "pending":
-        counts.pending++;
-        break;
-
-      case "completed":
-        counts.completed++;
-        break;
-
-      case "expired":
-        counts.expired++;
-        break;
+    if (task.calculatedStatus === "completed") {
+      counts.completed++;
+    } else if (task.calculatedStatus === "expired") {
+      counts.expired++;
+    } else {
+      counts.pending++;
     }
   });
 
@@ -606,54 +291,42 @@ function createTaskRow(task) {
   const assignedUser = getUserById(task.assignedTo);
 
   return `
+    <div class="task-row">
 
-        <div class="task-row">
+      <div class="task-main">
 
-            <div class="task-main">
+        <div class="task-title">
+          ${escapeHtml(task.title || "Untitled Task")}
+        </div>
 
-                <div class="task-title">
+        <div class="task-meta">
 
-                    ${escapeHtml(task.title || "Untitled Task")}
+          <span>
+            <i class="fa-solid fa-user"></i>
+            ${escapeHtml(
+              assignedUser?.name || task.assignedToName || "Unassigned",
+            )}
+          </span>
 
-                </div>
-
-
-                <div class="task-meta">
-
-                    <span>
-                        <i class="fa-solid fa-user"></i>
-
-                        ${escapeHtml(assignedUser?.name || "Unassigned")}
-
-                    </span>
-
-
-                    <span>
-
-                        <i class="fa-regular fa-calendar"></i>
-
-                        ${formatDateTime(task.scheduledAt)}
-
-                    </span>
-
-                </div>
-
-            </div>
-
-
-            <div class="task-side">
-
-                ${createStatusBadge(task.calculatedStatus)}
-
-            </div>
+          <span>
+            <i class="fa-regular fa-calendar"></i>
+            ${formatDateTime(task.scheduledAt)}
+          </span>
 
         </div>
 
-    `;
+      </div>
+
+      <div class="task-side">
+        ${createStatusBadge(task.calculatedStatus)}
+      </div>
+
+    </div>
+  `;
 }
 
 // ============================================================
-// TEAM OVERVIEW
+// TEAM
 // ============================================================
 
 function renderTeamOverview() {
@@ -675,44 +348,32 @@ function renderTeamOverview() {
       ).length;
 
       return `
+          <div class="team-user">
 
-                        <div class="team-user">
+            <div class="team-avatar">
+              ${getInitials(user.name)}
+            </div>
 
-                            <div class="team-avatar">
+            <div class="team-user-info">
 
-                                ${getInitials(user.name)}
+              <strong>
+                ${escapeHtml(user.name || "Unnamed")}
+              </strong>
 
-                            </div>
+              <span>
+                ${user.role === "admin" ? "Administrator" : "Employee"}
+              </span>
 
+            </div>
 
-                            <div class="team-user-info">
+            <span class="status-badge ${
+              user.role === "admin" ? "admin" : "employee"
+            }">
+              ${taskCount} tasks
+            </span>
 
-                                <strong>
-                                    ${escapeHtml(user.name || "Unnamed")}
-                                </strong>
-
-                                <span>
-                                    ${
-                                      user.role === "admin"
-                                        ? "Administrator"
-                                        : "Employee"
-                                    }
-                                </span>
-
-                            </div>
-
-
-                            <span class="status-badge ${
-                              user.role === "admin" ? "admin" : "employee"
-                            }">
-
-                                ${taskCount} tasks
-
-                            </span>
-
-                        </div>
-
-                    `;
+          </div>
+        `;
     })
     .join("");
 }
@@ -750,51 +411,40 @@ function createAdminTask(task) {
   const assignedUser = getUserById(task.assignedTo);
 
   return `
+    <article class="admin-task">
 
-        <article class="admin-task">
+      <div>
 
-            <div>
+        <div class="admin-task-title">
+          ${escapeHtml(task.title || "Untitled Task")}
+        </div>
 
-                <div class="admin-task-title">
+      </div>
 
-                    ${escapeHtml(task.title || "Untitled Task")}
+      <div class="admin-task-info">
+        <span>Assigned To</span>
 
-                </div>
+        ${escapeHtml(assignedUser?.name || task.assignedToName || "Unassigned")}
+      </div>
 
-            </div>
+      <div class="admin-task-info">
+        <span>Scheduled</span>
 
+        ${formatDateTime(task.scheduledAt)}
+      </div>
 
-            <div class="admin-task-info">
+      <div class="admin-task-info">
+        <span>Deadline</span>
 
-                <span>
-                    Assigned To
-                </span>
+        ${formatDateTime(task.deadline)}
+      </div>
 
-                ${escapeHtml(assignedUser?.name || "Unassigned")}
+      <div class="status-column">
+        ${createStatusBadge(task.calculatedStatus)}
+      </div>
 
-            </div>
-
-
-            <div class="admin-task-info">
-
-                <span>
-                    Deadline
-                </span>
-
-                ${formatDateTime(task.deadline)}
-
-            </div>
-
-
-            <div class="status-column">
-
-                ${createStatusBadge(task.calculatedStatus)}
-
-            </div>
-
-        </article>
-
-    `;
+    </article>
+  `;
 }
 
 // ============================================================
@@ -804,21 +454,15 @@ function createAdminTask(task) {
 function renderUsers() {
   if (!state.users.length) {
     el.usersTableBody.innerHTML = `
-
-            <tr>
-
-                <td
-                    colspan="6"
-                    class="table-loading"
-                >
-
-                    No users found.
-
-                </td>
-
-            </tr>
-
-        `;
+      <tr>
+        <td
+          colspan="6"
+          class="table-loading"
+        >
+          No users found.
+        </td>
+      </tr>
+    `;
 
     return;
   }
@@ -831,118 +475,93 @@ function createUserRow(user) {
     (task) => task.assignedTo === user.id,
   ).length;
 
-  const visible = user.showTasks !== false;
+  const visible = user.showTasks !== false && user.receiveTasks !== false;
+
+  const active = user.active !== false;
 
   return `
+    <tr>
 
-        <tr>
+      <td>
 
-            <td>
+        <div class="user-table-info">
 
-                <div class="user-table-info">
+          <div class="user-table-avatar">
+            ${getInitials(user.name)}
+          </div>
 
-                    <div class="user-table-avatar">
+          <div>
 
-                        ${getInitials(user.name)}
+            <strong>
+              ${escapeHtml(user.name || "Unnamed")}
+            </strong>
 
-                    </div>
+            <span>
+              ${escapeHtml(user.email || "")}
+            </span>
 
+          </div>
 
-                    <div>
+        </div>
 
-                        <strong>
+      </td>
 
-                            ${escapeHtml(user.name || "Unnamed")}
+      <td>
+        <span class="status-badge ${
+          user.role === "admin" ? "admin" : "employee"
+        }">
+          ${user.role === "admin" ? "Admin" : "Employee"}
+        </span>
+      </td>
 
-                        </strong>
+      <td>
+        ${taskCount}
+      </td>
 
+      <td>
 
-                        <span>
+        <span class="visibility ${visible ? "on" : "off"}">
 
-                            ${escapeHtml(user.email || "")}
+          <i class="fa-solid ${visible ? "fa-eye" : "fa-eye-slash"}"></i>
 
-                        </span>
+          ${visible ? "Visible" : "Hidden"}
 
-                    </div>
+        </span>
 
-                </div>
+      </td>
 
-            </td>
+      <td>
 
+        <span class="visibility ${active ? "on" : "off"}">
 
-            <td>
+          <i class="fa-solid ${
+            active ? "fa-circle-check" : "fa-circle-xmark"
+          }"></i>
 
-                <span class="status-badge ${
-                  user.role === "admin" ? "admin" : "employee"
-                }">
+          ${active ? "Active" : "Disabled"}
 
-                    ${user.role === "admin" ? "Admin" : "Employee"}
+        </span>
 
-                </span>
+      </td>
 
-            </td>
+      <td>
 
+        <div class="action-buttons">
 
-            <td>
-                ${taskCount}
-            </td>
+          <button
+            class="small-button"
+            title="Edit"
+            data-edit-user="${user.id}"
+          >
+            <i class="fa-solid fa-pen"></i>
+          </button>
 
+        </div>
 
-            <td>
+      </td>
 
-                <span class="visibility ${visible ? "on" : "off"}">
-
-                    <i class="fa-solid ${
-                      visible ? "fa-eye" : "fa-eye-slash"
-                    }"></i>
-
-                    ${visible ? "Visible" : "Hidden"}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <span class="visibility ${
-                  user.active !== false ? "on" : "off"
-                }">
-
-                    <i class="fa-solid ${
-                      user.active !== false
-                        ? "fa-circle-check"
-                        : "fa-circle-xmark"
-                    }"></i>
-
-                    ${user.active !== false ? "Active" : "Disabled"}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                <div class="action-buttons">
-
-                    <button
-                        class="small-button"
-                        title="Edit"
-                        data-edit-user="${user.id}"
-                    >
-
-                        <i class="fa-solid fa-pen"></i>
-
-                    </button>
-
-                </div>
-
-            </td>
-
-        </tr>
-
-    `;
+    </tr>
+  `;
 }
 
 // ============================================================
@@ -955,42 +574,36 @@ function populateUserSelects() {
   );
 
   el.assignedTo.innerHTML = `
+    <option value="">
+      Select employee
+    </option>
 
-        <option value="">
-            Select employee
-        </option>
-
-        ${employees
-          .map(
-            (user) =>
-              `
-                        <option value="${user.id}">
-                            ${escapeHtml(user.name)}
-                        </option>
-                        `,
-          )
-          .join("")}
-
-    `;
+    ${employees
+      .map(
+        (user) => `
+          <option value="${user.id}">
+            ${escapeHtml(user.name)}
+          </option>
+        `,
+      )
+      .join("")}
+  `;
 
   el.taskUserFilter.innerHTML = `
+    <option value="all">
+      All Users
+    </option>
 
-        <option value="all">
-            All Users
-        </option>
-
-        ${state.users
-          .map(
-            (user) =>
-              `
-                        <option value="${user.id}">
-                            ${escapeHtml(user.name)}
-                        </option>
-                        `,
-          )
-          .join("")}
-
-    `;
+    ${state.users
+      .map(
+        (user) => `
+          <option value="${user.id}">
+            ${escapeHtml(user.name)}
+          </option>
+        `,
+      )
+      .join("")}
+  `;
 
   el.taskUserFilter.value = state.taskUserFilter;
 }
@@ -1036,6 +649,16 @@ async function handleCreateTask(event) {
     return;
   }
 
+  if (scheduledAt <= new Date()) {
+    showToast(
+      "Invalid schedule",
+      "Scheduled time must be in the future.",
+      "error",
+    );
+
+    return;
+  }
+
   if (deadline <= scheduledAt) {
     showToast(
       "Invalid deadline",
@@ -1046,29 +669,25 @@ async function handleCreateTask(event) {
     return;
   }
 
-  try {
-    const submitButton = el.taskForm.querySelector('button[type="submit"]');
+  const submitButton = el.taskForm.querySelector('button[type="submit"]');
 
+  try {
     submitButton.disabled = true;
 
     submitButton.innerHTML = `
-                <span class="spinner"></span>
-                Creating...
-            `;
+      <span class="spinner"></span>
+      Creating...
+    `;
 
     await createTask({
       title,
-
       description,
-
       link,
 
       createdBy: state.authUser.uid,
 
       assignedTo,
-
       scheduledAt,
-
       deadline,
     });
 
@@ -1082,25 +701,87 @@ async function handleCreateTask(event) {
   } catch (error) {
     console.error("Create task error:", error);
 
-    showToast("Unable to create task", getReadableError(error), "error");
+    showToast(
+      "Unable to create task",
+      getReadableFirebaseError(error),
+      "error",
+    );
   } finally {
-    const submitButton = el.taskForm.querySelector('button[type="submit"]');
-
     submitButton.disabled = false;
 
     submitButton.innerHTML = `
-                <i class="fa-solid fa-plus"></i>
-                Create Task
-            `;
+      <i class="fa-solid fa-plus"></i>
+      Create Task
+    `;
+  }
+}
+
+// ============================================================
+// CREATE USER
+// ============================================================
+
+async function handleCreateUser(event) {
+  event.preventDefault();
+
+  const name = document.getElementById("userFullName").value.trim();
+
+  const email = document.getElementById("userEmailInput").value.trim();
+
+  const password = document.getElementById("userPassword").value;
+
+  const role = document.getElementById("userRole").value;
+
+  const showTasks = document.getElementById("showTasks").value === "true";
+
+  const submitButton = el.userForm.querySelector('button[type="submit"]');
+
+  try {
+    submitButton.disabled = true;
+
+    submitButton.innerHTML = `
+      <span class="spinner"></span>
+      Creating...
+    `;
+
+    await createUser({
+      name,
+      email,
+      password,
+      role,
+      receiveTasks: showTasks,
+      active: true,
+    });
+
+    closeModal("userModal");
+
+    el.userForm.reset();
+
+    showToast(
+      "User created",
+      `${name} can now sign in using the created account.`,
+    );
+
+    await loadData();
+  } catch (error) {
+    console.error("Create user error:", error);
+
+    showToast(
+      "Unable to create user",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  } finally {
+    submitButton.disabled = false;
+
+    submitButton.innerHTML = `
+      <i class="fa-solid fa-user-plus"></i>
+      Create User
+    `;
   }
 }
 
 // ============================================================
 // EDIT USER
-// ============================================================
-//
-// The actual updateUser() function will be added to
-// firebase.js. The UI is already prepared for it.
 // ============================================================
 
 function openEditUser(userId) {
@@ -1118,7 +799,7 @@ function openEditUser(userId) {
   document.getElementById("editUserRole").value = user.role || "employee";
 
   document.getElementById("editShowTasks").value = String(
-    user.showTasks !== false,
+    user.showTasks !== false && user.receiveTasks !== false,
   );
 
   document.getElementById("editUserStatus").value = String(
@@ -1126,6 +807,57 @@ function openEditUser(userId) {
   );
 
   openModal("editUserModal");
+}
+
+async function handleEditUser(event) {
+  event.preventDefault();
+
+  const uid = document.getElementById("editUserId").value;
+
+  const role = document.getElementById("editUserRole").value;
+
+  const showTasks = document.getElementById("editShowTasks").value === "true";
+
+  const active = document.getElementById("editUserStatus").value === "true";
+
+  const submitButton = el.editUserForm.querySelector('button[type="submit"]');
+
+  try {
+    submitButton.disabled = true;
+
+    submitButton.innerHTML = `
+      <span class="spinner"></span>
+      Saving...
+    `;
+
+    await updateUser(uid, {
+      role,
+      showTasks,
+      receiveTasks: showTasks,
+      active,
+    });
+
+    closeModal("editUserModal");
+
+    showToast("User updated", "The user settings were updated successfully.");
+
+    await loadData();
+  } catch (error) {
+    console.error("Update user error:", error);
+
+    showToast(
+      "Unable to update user",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  } finally {
+    submitButton.disabled = false;
+
+    submitButton.innerHTML = `
+      <i class="fa-solid fa-floppy-disk"></i>
+      Save Changes
+    `;
+  }
 }
 
 // ============================================================
@@ -1191,44 +923,37 @@ function setupFilters() {
 // ============================================================
 
 function setupActions() {
-  el.addTaskButton.addEventListener("click", () => openModal("taskModal"));
+  el.addTaskButton?.addEventListener("click", () => openModal("taskModal"));
 
-  el.dashboardAddTaskButton.addEventListener("click", () =>
+  el.dashboardAddTaskButton?.addEventListener("click", () =>
     openModal("taskModal"),
   );
 
-  el.addUserButton.addEventListener("click", () => openModal("userModal"));
+  el.addUserButton?.addEventListener("click", () => openModal("userModal"));
 
-  el.refreshButton.addEventListener("click", loadData);
+  el.refreshButton?.addEventListener("click", loadData);
 
-  el.logoutButton.addEventListener("click", async () => {
+  el.logoutButton?.addEventListener("click", async () => {
     try {
       await logoutUser();
+
+      window.location.replace("login.html");
     } catch (error) {
-      console.error(error);
+      console.error("Logout error:", error);
     }
   });
 
-  el.taskForm.addEventListener("submit", handleCreateTask);
+  el.taskForm?.addEventListener("submit", handleCreateTask);
 
-  // Future Firebase user update function
-  // will be connected here.
+  el.userForm?.addEventListener("submit", handleCreateUser);
 
-  el.editUserForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    showToast(
-      "Ready",
-      "User update function will be connected through firebase.js.",
-      "error",
-    );
-  });
+  el.editUserForm?.addEventListener("submit", handleEditUser);
 
   document.addEventListener("click", (event) => {
-    const editButton = event.target.closest("[data-edit-user]");
+    const button = event.target.closest("[data-edit-user]");
 
-    if (editButton) {
-      openEditUser(editButton.dataset.editUser);
+    if (button) {
+      openEditUser(button.dataset.editUser);
     }
   });
 }
@@ -1261,6 +986,8 @@ function setupModals() {
       .querySelectorAll(".modal-overlay.active")
       .forEach((modal) => closeModal(modal.id));
   });
+
+  el.closeToast?.addEventListener("click", hideToast);
 }
 
 function openModal(id) {
@@ -1278,65 +1005,89 @@ function closeModal(id) {
 }
 
 // ============================================================
+// TOAST
+// ============================================================
+
+let toastTimer = null;
+
+function showToast(title, message, type = "success") {
+  if (!el.toast) {
+    return;
+  }
+
+  el.toastTitle.textContent = title;
+
+  el.toastMessage.textContent = message;
+
+  const icon = el.toast.querySelector(".toast-icon i");
+
+  if (type === "error") {
+    icon.className = "fa-solid fa-circle-exclamation";
+
+    el.toast.classList.add("error");
+  } else {
+    icon.className = "fa-solid fa-check";
+
+    el.toast.classList.remove("error");
+  }
+
+  el.toast.classList.add("active");
+
+  clearTimeout(toastTimer);
+
+  toastTimer = setTimeout(hideToast, 4500);
+}
+
+function hideToast() {
+  el.toast?.classList.remove("active");
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 
 function getUserById(userId) {
-  return state.users.find((user) => user.id === userId);
+  return state.users.find((user) => user.id === userId || user.uid === userId);
 }
 
 function createStatusBadge(status) {
   const labels = {
     pending: "Pending",
-
     completed: "Completed",
-
     expired: "Expired",
   };
 
   return `
-
-        <span class="status-badge ${status}">
-
-            ${labels[status] || "Unknown"}
-
-        </span>
-
-    `;
+    <span class="status-badge ${status}">
+      ${labels[status] || "Unknown"}
+    </span>
+  `;
 }
 
 function createEmptyState(title, message) {
   return `
+    <div class="empty-state">
 
-        <div class="empty-state">
+      <div class="empty-state-icon">
+        <i class="fa-regular fa-folder-open"></i>
+      </div>
 
-            <div class="empty-state-icon">
+      <strong>
+        ${escapeHtml(title)}
+      </strong>
 
-                <i class="fa-regular fa-folder-open"></i>
+      <p>
+        ${escapeHtml(message)}
+      </p>
 
-            </div>
-
-            <strong>
-                ${escapeHtml(title)}
-            </strong>
-
-            <p>
-                ${escapeHtml(message)}
-            </p>
-
-        </div>
-
-    `;
+    </div>
+  `;
 }
 
 function getDateValue(value) {
   const date = convertFirebaseDate(value);
 
-  if (!date) {
-    return 0;
-  }
-
-  return date.getTime();
+  return date ? date.getTime() : 0;
 }
 
 function formatDateTime(value) {
@@ -1367,11 +1118,7 @@ function getInitials(name) {
 }
 
 function escapeHtml(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return String(value)
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -1379,67 +1126,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function setLoading(value) {
-  state.loading = value;
+function setLoading(isLoading) {
+  state.loading = isLoading;
 }
-
-function getReadableError(error) {
-  if (!error) {
-    return "Something went wrong.";
-  }
-
-  const messages = {
-    "permission-denied": "You don't have permission to perform this action.",
-
-    "failed-precondition": "Firestore requires an index for this request.",
-
-    "auth/network-request-failed":
-      "Network error. Please check your connection.",
-  };
-
-  if (messages[error.code]) {
-    return messages[error.code];
-  }
-
-  return error.message || "Something went wrong.";
-}
-
-// ============================================================
-// TOAST
-// ============================================================
-
-let toastTimer;
-
-function showToast(title, message, type = "success") {
-  el.toastTitle.textContent = title;
-
-  el.toastMessage.textContent = message;
-
-  const icon = el.toast.querySelector(".toast-icon i");
-
-  const iconContainer = el.toast.querySelector(".toast-icon");
-
-  if (type === "error") {
-    icon.className = "fa-solid fa-circle-exclamation";
-
-    iconContainer.style.background = "var(--danger-bg)";
-
-    iconContainer.style.color = "var(--danger)";
-  } else {
-    icon.className = "fa-solid fa-check";
-
-    iconContainer.style.background = "var(--success-bg)";
-
-    iconContainer.style.color = "var(--success)";
-  }
-
-  el.toast.classList.add("active");
-
-  clearTimeout(toastTimer);
-
-  toastTimer = setTimeout(() => el.toast.classList.remove("active"), 4000);
-}
-
-el.closeToast.addEventListener("click", () =>
-  el.toast.classList.remove("active"),
-);

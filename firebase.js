@@ -1,9 +1,19 @@
 // ============================================================
-// firebase.js
-// Central Firebase Data Layer
+// TaskFlow Firebase Core
+// ============================================================
+//
+// IMPORTANT:
+// admin.js / employee.js MUST NOT import Firebase SDK directly.
+//
+// All Firebase communication goes through this file.
+//
 // ============================================================
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import {
+  initializeApp,
+  getApps,
+  getApp,
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
 import {
   getAuth,
@@ -32,38 +42,42 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 // ============================================================
-// CONFIG
+// FIREBASE CONFIG
 // ============================================================
 
 const firebaseConfig = {
   apiKey: "AIzaSyAreXF_U51NYnqtLHZ37vU41b9Rv3M00gs",
-
   authDomain: "archai-tasks-manager.firebaseapp.com",
-
   projectId: "archai-tasks-manager",
-
   storageBucket: "archai-tasks-manager.firebasestorage.app",
-
   messagingSenderId: "127267057347",
-
   appId: "1:127267057347:web:edb04505a80eba36d47c76",
-
   measurementId: "G-ZFW35C5NDE",
 };
 
 // ============================================================
-// INITIALIZE
+// APP
 // ============================================================
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
-
 const db = getFirestore(app);
 
-// Secondary app.
-// Used when Admin creates another Firebase Auth account.
-const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+// ============================================================
+// SECONDARY APP
+// Used when admin creates another Firebase Auth user.
+// ============================================================
+
+const secondaryAppName = "taskflow-secondary";
+
+let secondaryApp;
+
+try {
+  secondaryApp = getApp(secondaryAppName);
+} catch {
+  secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+}
 
 const secondaryAuth = getAuth(secondaryApp);
 
@@ -75,7 +89,7 @@ const USERS_COLLECTION = "users";
 const TASKS_COLLECTION = "tasks";
 
 // ============================================================
-// HELPERS
+// INTERNAL HELPERS
 // ============================================================
 
 function requireAuth() {
@@ -88,7 +102,49 @@ function requireAuth() {
   return user;
 }
 
-function timestampToDate(value) {
+function getCurrentUid() {
+  return auth.currentUser?.uid || null;
+}
+
+function clean(value) {
+  return typeof value === "string" ? value.trim() : value;
+}
+
+function dateToTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Timestamp) {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return null;
+    }
+
+    return Timestamp.fromDate(value);
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return Timestamp.fromDate(date);
+  }
+
+  if (value?.toDate) {
+    return Timestamp.fromDate(value.toDate());
+  }
+
+  return null;
+}
+
+function toDate(value) {
   if (!value) {
     return null;
   }
@@ -101,11 +157,11 @@ function timestampToDate(value) {
     return value.toDate();
   }
 
-  if (typeof value?.toDate === "function") {
+  if (value?.toDate) {
     return value.toDate();
   }
 
-  if (typeof value === "string") {
+  if (typeof value === "string" || typeof value === "number") {
     const date = new Date(value);
 
     if (!Number.isNaN(date.getTime())) {
@@ -116,33 +172,7 @@ function timestampToDate(value) {
   return null;
 }
 
-function toTimestamp(value) {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Timestamp) {
-    return value;
-  }
-
-  if (value instanceof Date) {
-    return Timestamp.fromDate(value);
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isNaN(date.getTime())) {
-    return Timestamp.fromDate(date);
-  }
-
-  return null;
-}
-
 function normalizeUser(snapshot) {
-  if (!snapshot.exists()) {
-    return null;
-  }
-
   return {
     id: snapshot.id,
     uid: snapshot.id,
@@ -151,59 +181,137 @@ function normalizeUser(snapshot) {
 }
 
 function normalizeTask(snapshot) {
-  if (!snapshot.exists()) {
-    return null;
+  const raw = snapshot.data();
+
+  let assignedTo = raw.assignedTo || null;
+  let assignedToName = raw.assignedToName || "";
+
+  let assignees = Array.isArray(raw.assignees)
+    ? raw.assignees.map((item) => ({
+        uid: item.uid,
+        name: item.name || "",
+        scheduledAt: item.scheduledAt || null,
+        status: item.status || "pending",
+        completedAt: item.completedAt || null,
+      }))
+    : [];
+
+  // ----------------------------------------------------------
+  // Compatibility with old single-assignee task structure
+  // ----------------------------------------------------------
+
+  if (!assignees.length && assignedTo) {
+    assignees = [
+      {
+        uid: assignedTo,
+        name: assignedToName,
+        scheduledAt: raw.scheduledAt || null,
+        status: raw.completedAt ? "done" : "pending",
+        completedAt: raw.completedAt || null,
+      },
+    ];
   }
 
-  const data = snapshot.data();
-
-  return normalizeTaskObject({
-    id: snapshot.id,
-    ...data,
-  });
-}
-
-function normalizeTaskObject(task) {
-  if (!task) {
-    return null;
+  if (!assignedTo && assignees.length === 1) {
+    assignedTo = assignees[0].uid;
+    assignedToName = assignees[0].name;
   }
 
-  const scheduledAt = task.scheduledAt ?? task.scheduledTime ?? null;
+  const scheduledAt =
+    raw.scheduledAt ||
+    assignees.find((item) => item.scheduledAt)?.scheduledAt ||
+    null;
 
   const deadline =
-    task.deadline ??
-    (task.dueDate && task.dueTime ? `${task.dueDate}T${task.dueTime}` : null);
-
-  const assignedTo = task.assignedTo ?? task.assigneeId ?? null;
-
-  const completed = task.completed === true || task.status === "completed";
+    raw.deadline || combineLegacyDueDateTime(raw.dueDate, raw.dueTime);
 
   return {
-    ...task,
+    id: snapshot.id,
 
-    id: task.id,
+    ...raw,
 
-    title: task.title || task.description || "Untitled Task",
+    title: raw.title || raw.name || "Untitled Task",
 
-    description: task.description || "",
+    description: raw.description || "",
 
-    link: task.link || task.postUrl || "",
+    link: raw.link || raw.postUrl || "",
+
+    postUrl: raw.postUrl || raw.link || "",
 
     assignedTo,
+
+    assignedToName,
 
     scheduledAt,
 
     deadline,
 
-    completed,
-
-    calculatedStatus: calculateTaskStatus({
-      ...task,
-      scheduledAt,
-      deadline,
-      completed,
-    }),
+    assignees,
   };
+}
+
+function combineLegacyDueDateTime(date, time) {
+  if (!date || !time) {
+    return null;
+  }
+
+  const value = `${date}T${time}`;
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return Timestamp.fromDate(parsed);
+}
+
+function assignmentForCurrentUser(task) {
+  const uid = getCurrentUid();
+
+  if (!uid || !Array.isArray(task?.assignees)) {
+    return null;
+  }
+
+  return task.assignees.find((assignment) => assignment.uid === uid) || null;
+}
+
+// ============================================================
+// ERROR HANDLING
+// ============================================================
+
+export function getReadableFirebaseError(error) {
+  if (!error) {
+    return "حدث خطأ غير معروف.";
+  }
+
+  const code = error.code || "";
+
+  const messages = {
+    "auth/invalid-credential": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+
+    "auth/invalid-login-credentials":
+      "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+
+    "auth/user-not-found": "لا يوجد حساب بهذا البريد الإلكتروني.",
+
+    "auth/wrong-password": "كلمة المرور غير صحيحة.",
+
+    "auth/invalid-email": "البريد الإلكتروني غير صحيح.",
+
+    "auth/email-already-in-use": "هذا البريد الإلكتروني مستخدم بالفعل.",
+
+    "auth/weak-password": "كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.",
+
+    "auth/network-request-failed": "حدثت مشكلة في الاتصال بالإنترنت.",
+
+    "permission-denied": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+
+    "failed-precondition":
+      "Firebase يحتاج إلى إعداد إضافي قبل تنفيذ هذا الإجراء.",
+  };
+
+  return messages[code] || error.message || "حدث خطأ أثناء تنفيذ العملية.";
 }
 
 // ============================================================
@@ -211,15 +319,7 @@ function normalizeTaskObject(task) {
 // ============================================================
 
 export async function login(email, password) {
-  if (!email?.trim()) {
-    throw new Error("البريد الإلكتروني مطلوب.");
-  }
-
-  if (!password) {
-    throw new Error("كلمة المرور مطلوبة.");
-  }
-
-  const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+  const result = await signInWithEmailAndPassword(auth, clean(email), password);
 
   return result.user;
 }
@@ -228,26 +328,30 @@ export async function logout() {
   await signOut(auth);
 }
 
-export function getFirebaseUser() {
-  return auth.currentUser;
-}
-
-// Current API
 export function watchAuth(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
-// Compatibility API used by the existing UI
-export function listenToAuthState(callback) {
-  return watchAuth(callback);
+export function getFirebaseUser() {
+  return auth.currentUser;
 }
 
 export function getCurrentAuthUser() {
   return auth.currentUser;
 }
 
+export async function getCurrentUserProfile() {
+  const user = requireAuth();
+
+  return await getUserById(user.uid);
+}
+
+// Compatibility aliases
+export const listenToAuthState = watchAuth;
+export const logoutUser = logout;
+
 // ============================================================
-// USER PROFILE
+// USERS
 // ============================================================
 
 export async function getUserById(uid) {
@@ -257,34 +361,19 @@ export async function getUserById(uid) {
 
   const snapshot = await getDoc(doc(db, USERS_COLLECTION, uid));
 
+  if (!snapshot.exists()) {
+    return null;
+  }
+
   return normalizeUser(snapshot);
 }
 
-// Compatibility name used by existing UI
-export async function getUser(uid) {
-  return getUserById(uid);
-}
-
-export async function getCurrentUserProfile() {
-  const user = requireAuth();
-
-  return getUserById(user.uid);
-}
-
-// ============================================================
-// USERS
-// ============================================================
+export const getUser = getUserById;
 
 export async function getUsers() {
-  requireAuth();
-
   const snapshot = await getDocs(collection(db, USERS_COLLECTION));
 
-  return snapshot.docs.map((item) => ({
-    id: item.id,
-    uid: item.id,
-    ...item.data(),
-  }));
+  return snapshot.docs.map(normalizeUser);
 }
 
 export async function getEmployees() {
@@ -302,17 +391,15 @@ export async function getAdmins() {
 }
 
 export function watchUsers(callback) {
-  requireAuth();
-
-  return onSnapshot(collection(db, USERS_COLLECTION), (snapshot) => {
-    const users = snapshot.docs.map((item) => ({
-      id: item.id,
-      uid: item.id,
-      ...item.data(),
-    }));
-
-    callback(users);
-  });
+  return onSnapshot(
+    collection(db, USERS_COLLECTION),
+    (snapshot) => {
+      callback(snapshot.docs.map(normalizeUser));
+    },
+    (error) => {
+      console.error("Users realtime error:", error);
+    },
+  );
 }
 
 // ============================================================
@@ -329,11 +416,14 @@ export async function createUser({
 }) {
   requireAuth();
 
-  if (!name?.trim()) {
+  name = clean(name);
+  email = clean(email)?.toLowerCase();
+
+  if (!name) {
     throw new Error("اسم المستخدم مطلوب.");
   }
 
-  if (!email?.trim()) {
+  if (!email) {
     throw new Error("البريد الإلكتروني مطلوب.");
   }
 
@@ -341,14 +431,13 @@ export async function createUser({
     throw new Error("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
   }
 
-  if (role !== "admin" && role !== "employee") {
+  if (!["admin", "employee"].includes(role)) {
     throw new Error("نوع المستخدم غير صحيح.");
   }
 
-  // Create Firebase Auth account
   const result = await createUserWithEmailAndPassword(
     secondaryAuth,
-    email.trim(),
+    email,
     password,
   );
 
@@ -356,33 +445,37 @@ export async function createUser({
 
   try {
     await updateProfile(newUser, {
-      displayName: name.trim(),
+      displayName: name,
     });
   } catch (error) {
-    console.warn("Display name update failed:", error);
+    console.warn("Could not update Firebase display name:", error);
   }
 
   const userData = {
     uid: newUser.uid,
-
-    name: name.trim(),
-
-    email: email.trim().toLowerCase(),
-
+    name,
+    email,
     role,
-
-    active,
-
-    receiveTasks,
-
+    receiveTasks: Boolean(receiveTasks),
+    showTasks: Boolean(receiveTasks),
+    active: Boolean(active),
     createdAt: serverTimestamp(),
   };
 
-  await setDoc(doc(db, USERS_COLLECTION, newUser.uid), userData);
+  try {
+    await setDoc(doc(db, USERS_COLLECTION, newUser.uid), userData);
+  } catch (error) {
+    try {
+      await signOut(secondaryAuth);
+    } catch {}
+
+    throw error;
+  }
 
   await signOut(secondaryAuth);
 
   return {
+    uid: newUser.uid,
     id: newUser.uid,
     ...userData,
   };
@@ -392,54 +485,61 @@ export async function createUser({
 // UPDATE USER
 // ============================================================
 
-export async function updateUser(uid, data) {
+export async function updateUser(uid, data = {}) {
   requireAuth();
 
   if (!uid) {
     throw new Error("User ID is required.");
   }
 
-  const update = {};
+  const updateData = {};
 
   if (data.name !== undefined) {
-    update.name = String(data.name).trim();
-  }
-
-  if (data.email !== undefined) {
-    update.email = String(data.email).trim().toLowerCase();
+    updateData.name = clean(data.name);
   }
 
   if (data.role !== undefined) {
-    if (data.role !== "admin" && data.role !== "employee") {
+    if (!["admin", "employee"].includes(data.role)) {
       throw new Error("نوع المستخدم غير صحيح.");
     }
 
-    update.role = data.role;
+    updateData.role = data.role;
   }
 
   if (data.receiveTasks !== undefined) {
-    update.receiveTasks = Boolean(data.receiveTasks);
+    updateData.receiveTasks = Boolean(data.receiveTasks);
+
+    updateData.showTasks = Boolean(data.receiveTasks);
   }
 
-  // Compatibility with old UI
   if (data.showTasks !== undefined) {
-    update.receiveTasks = Boolean(data.showTasks);
+    updateData.showTasks = Boolean(data.showTasks);
+
+    updateData.receiveTasks = Boolean(data.showTasks);
   }
 
   if (data.active !== undefined) {
-    update.active = Boolean(data.active);
+    updateData.active = Boolean(data.active);
   }
 
-  update.updatedAt = serverTimestamp();
+  updateData.updatedAt = serverTimestamp();
 
-  await updateDoc(doc(db, USERS_COLLECTION, uid), update);
+  await updateDoc(doc(db, USERS_COLLECTION, uid), updateData);
 
-  return getUserById(uid);
+  return await getUserById(uid);
 }
 
-// ============================================================
-// DELETE USER PROFILE
-// ============================================================
+export async function setUserActive(uid, active) {
+  return await updateUser(uid, {
+    active,
+  });
+}
+
+export async function setUserTaskVisibility(uid, visible) {
+  return await updateUser(uid, {
+    showTasks: visible,
+  });
+}
 
 export async function deleteUser(uid) {
   requireAuth();
@@ -448,7 +548,7 @@ export async function deleteUser(uid) {
     throw new Error("User ID is required.");
   }
 
-  if (uid === auth.currentUser?.uid) {
+  if (uid === getCurrentUid()) {
     throw new Error("لا يمكنك حذف حسابك الحالي.");
   }
 
@@ -462,110 +562,95 @@ export async function deleteUser(uid) {
 // ============================================================
 
 export async function createTask({
-  title = "",
+  title,
   description = "",
   link = "",
   createdBy = null,
   assignedTo = null,
   scheduledAt = null,
   deadline = null,
-
-  // New structure compatibility
-  postUrl = null,
-  dueDate = null,
-  dueTime = null,
-  visibility = "employees",
-  assignees = null,
 }) {
-  const currentUser = requireAuth();
+  const user = requireAuth();
 
-  const creator = await getUserById(currentUser.uid);
-
-  const finalCreatedBy = createdBy || currentUser.uid;
-
-  let finalAssignees = [];
-
-  if (Array.isArray(assignees)) {
-    finalAssignees = assignees.map((person) => ({
-      uid: person.uid,
-
-      name: person.name,
-
-      scheduledAt: person.scheduledAt || null,
-
-      status: person.status || "pending",
-
-      completedAt: null,
-    }));
-  } else if (assignedTo) {
-    const assignedUser = await getUserById(assignedTo);
-
-    if (assignedUser) {
-      finalAssignees = [
-        {
-          uid: assignedUser.uid,
-
-          name: assignedUser.name,
-
-          scheduledAt: scheduledAt || null,
-
-          status: "pending",
-
-          completedAt: null,
-        },
-      ];
-    }
+  if (!title?.trim()) {
+    throw new Error("عنوان المهمة مطلوب.");
   }
+
+  if (!assignedTo) {
+    throw new Error("يجب اختيار موظف.");
+  }
+
+  const employee = await getUserById(assignedTo);
+
+  if (!employee) {
+    throw new Error("الموظف غير موجود.");
+  }
+
+  if (employee.role !== "employee") {
+    throw new Error("لا يمكن تعيين المهمة لهذا المستخدم.");
+  }
+
+  if (employee.active === false) {
+    throw new Error("هذا الموظف غير مفعل.");
+  }
+
+  const scheduledTimestamp = dateToTimestamp(scheduledAt);
+
+  const deadlineTimestamp = dateToTimestamp(deadline);
+
+  if (!scheduledTimestamp || !deadlineTimestamp) {
+    throw new Error("وقت المهمة أو الموعد النهائي غير صحيح.");
+  }
+
+  if (deadlineTimestamp.toMillis() <= scheduledTimestamp.toMillis()) {
+    throw new Error("الموعد النهائي يجب أن يكون بعد وقت المهمة.");
+  }
+
+  const creator = await getUserById(user.uid);
 
   const taskData = {
     title: title.trim(),
 
-    description: description.trim(),
+    description: description?.trim() || "",
 
-    link: (link || postUrl || "").trim(),
+    link: link?.trim() || "",
 
-    postUrl: (postUrl || link || "").trim(),
+    postUrl: link?.trim() || "",
 
-    createdBy: finalCreatedBy,
+    createdBy: createdBy || user.uid,
 
-    createdByName:
-      creator?.name || currentUser.displayName || currentUser.email,
-
-    assignedTo: assignedTo || finalAssignees[0]?.uid || null,
-
-    scheduledAt: toTimestamp(scheduledAt),
-
-    deadline: toTimestamp(deadline),
-
-    dueDate: dueDate || (deadline ? formatDateForInput(deadline) : null),
-
-    dueTime: dueTime || (deadline ? formatTimeForInput(deadline) : null),
-
-    visibility,
-
-    status: "open",
-
-    completed: false,
-
-    assignees: finalAssignees,
+    createdByName: creator?.name || user.displayName || user.email || "",
 
     createdAt: serverTimestamp(),
+
+    scheduledAt: scheduledTimestamp,
+
+    deadline: deadlineTimestamp,
+
+    assignedTo: assignedTo,
+
+    assignedToName: employee.name || "",
+
+    status: "pending",
+
+    assignees: [
+      {
+        uid: employee.uid,
+        name: employee.name || "",
+        scheduledAt: scheduledTimestamp,
+        status: "pending",
+        completedAt: null,
+      },
+    ],
   };
 
   const ref = await addDoc(collection(db, TASKS_COLLECTION), taskData);
 
   return {
     id: ref.id,
-    ...normalizeTaskObject({
-      id: ref.id,
-      ...taskData,
-    }),
+    ...taskData,
   };
 }
-
-// ============================================================
-// GET TASK
-// ============================================================
 
 export async function getTask(taskId) {
   if (!taskId) {
@@ -574,16 +659,14 @@ export async function getTask(taskId) {
 
   const snapshot = await getDoc(doc(db, TASKS_COLLECTION, taskId));
 
+  if (!snapshot.exists()) {
+    return null;
+  }
+
   return normalizeTask(snapshot);
 }
 
-// ============================================================
-// GET ALL TASKS
-// ============================================================
-
 export async function getTasks() {
-  requireAuth();
-
   const q = query(
     collection(db, TASKS_COLLECTION),
     orderBy("createdAt", "desc"),
@@ -591,110 +674,98 @@ export async function getTasks() {
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((item) =>
-    normalizeTaskObject({
-      id: item.id,
-      ...item.data(),
-    }),
-  );
+  return snapshot.docs.map(normalizeTask);
 }
 
-// Compatibility API
-export async function getAllTasks() {
-  return getTasks();
-}
-
-// ============================================================
-// GET TASKS FOR USER
-// ============================================================
-
-export async function getTasksForUser(userId) {
-  requireAuth();
-
-  const tasks = await getTasks();
-
-  return tasks.filter((task) => {
-    if (task.assignedTo === userId) {
-      return true;
-    }
-
-    if (Array.isArray(task.assignees)) {
-      return task.assignees.some((person) => person.uid === userId);
-    }
-
-    return false;
-  });
-}
-
-// ============================================================
-// WATCH TASKS
-// ============================================================
+export const getAllTasks = getTasks;
 
 export function watchTasks(callback) {
-  requireAuth();
-
   const q = query(
     collection(db, TASKS_COLLECTION),
     orderBy("createdAt", "desc"),
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const tasks = snapshot.docs.map((item) =>
-      normalizeTaskObject({
-        id: item.id,
-        ...item.data(),
-      }),
-    );
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      callback(snapshot.docs.map(normalizeTask));
+    },
+    (error) => {
+      console.error("Tasks realtime error:", error);
+    },
+  );
+}
 
-    callback(tasks);
-  });
+export function watchTask(taskId, callback) {
+  return onSnapshot(
+    doc(db, TASKS_COLLECTION, taskId),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+
+      callback(normalizeTask(snapshot));
+    },
+    (error) => {
+      console.error("Task realtime error:", error);
+    },
+  );
 }
 
 // ============================================================
-// UPDATE TASK
+// UPDATE / DELETE TASK
 // ============================================================
 
-export async function updateTask(taskId, data) {
+export async function updateTask(taskId, data = {}) {
   requireAuth();
 
-  const update = {};
-
-  const allowedFields = [
-    "title",
-    "description",
-    "link",
-    "postUrl",
-    "assignedTo",
-    "visibility",
-    "status",
-    "completed",
-    "assignees",
-    "scheduledAt",
-    "deadline",
-    "dueDate",
-    "dueTime",
-  ];
-
-  for (const field of allowedFields) {
-    if (data[field] !== undefined) {
-      if (field === "scheduledAt" || field === "deadline") {
-        update[field] = toTimestamp(data[field]);
-      } else {
-        update[field] = data[field];
-      }
-    }
+  if (!taskId) {
+    throw new Error("Task ID is required.");
   }
 
-  update.updatedAt = serverTimestamp();
+  const allowed = {};
 
-  await updateDoc(doc(db, TASKS_COLLECTION, taskId), update);
+  if (data.title !== undefined) {
+    allowed.title = clean(data.title);
+  }
 
-  return getTask(taskId);
+  if (data.description !== undefined) {
+    allowed.description = clean(data.description) || "";
+  }
+
+  if (data.link !== undefined) {
+    allowed.link = clean(data.link) || "";
+
+    allowed.postUrl = clean(data.link) || "";
+  }
+
+  if (data.scheduledAt !== undefined) {
+    allowed.scheduledAt = dateToTimestamp(data.scheduledAt);
+  }
+
+  if (data.deadline !== undefined) {
+    allowed.deadline = dateToTimestamp(data.deadline);
+  }
+
+  if (data.assignedTo !== undefined) {
+    allowed.assignedTo = data.assignedTo;
+  }
+
+  if (data.status !== undefined) {
+    allowed.status = data.status;
+  }
+
+  if (data.assignees !== undefined) {
+    allowed.assignees = data.assignees;
+  }
+
+  allowed.updatedAt = serverTimestamp();
+
+  await updateDoc(doc(db, TASKS_COLLECTION, taskId), allowed);
+
+  return await getTask(taskId);
 }
-
-// ============================================================
-// DELETE TASK
-// ============================================================
 
 export async function deleteTask(taskId) {
   requireAuth();
@@ -705,10 +776,44 @@ export async function deleteTask(taskId) {
 }
 
 // ============================================================
+// EMPLOYEE TASKS
+// ============================================================
+
+export async function getTasksForUser(userId) {
+  requireAuth();
+
+  if (!userId) {
+    return [];
+  }
+
+  const tasks = await getTasks();
+
+  return tasks.filter((task) => {
+    if (Array.isArray(task.assignees)) {
+      return task.assignees.some((assignment) => assignment.uid === userId);
+    }
+
+    return task.assignedTo === userId;
+  });
+}
+
+export async function getMyTasks() {
+  const user = requireAuth();
+
+  return await getTasksForUser(user.uid);
+}
+
+export async function getMyTaskAssignment(task) {
+  requireAuth();
+
+  return assignmentForCurrentUser(task);
+}
+
+// ============================================================
 // COMPLETE TASK
 // ============================================================
 
-export async function completeTask(taskId) {
+export async function completeTaskForCurrentUser(taskId) {
   const user = requireAuth();
 
   const task = await getTask(taskId);
@@ -717,48 +822,51 @@ export async function completeTask(taskId) {
     throw new Error("المهمة غير موجودة.");
   }
 
-  // New assignee model
-  if (Array.isArray(task.assignees) && task.assignees.length) {
-    const assignees = task.assignees.map((person) => {
-      if (person.uid !== user.uid) {
-        return person;
-      }
+  const assignment = assignmentForCurrentUser(task);
 
-      return {
-        ...person,
-
-        status: "done",
-
-        completedAt: serverTimestamp(),
-      };
-    });
-
-    await updateDoc(doc(db, TASKS_COLLECTION, taskId), {
-      assignees,
-
-      updatedAt: serverTimestamp(),
-    });
-
-    return getTask(taskId);
+  if (!assignment) {
+    throw new Error("هذه المهمة غير مسندة إليك.");
   }
 
-  // Old / simple model
-  if (task.assignedTo !== user.uid) {
-    throw new Error("هذه المهمة ليست مسندة إليك.");
+  if (assignment.status === "done" || assignment.completedAt) {
+    return task;
   }
+
+  const deadline = toDate(task.deadline);
+
+  if (deadline && Date.now() > deadline.getTime()) {
+    throw new Error("انتهى موعد هذه المهمة ولا يمكن إكمالها الآن.");
+  }
+
+  const assignees = Array.isArray(task.assignees)
+    ? task.assignees.map((item) => ({ ...item }))
+    : [];
+
+  const index = assignees.findIndex((item) => item.uid === user.uid);
+
+  if (index === -1) {
+    throw new Error("تعذر العثور على التكليف.");
+  }
+
+  assignees[index] = {
+    ...assignees[index],
+    status: "done",
+    completedAt: Timestamp.now(),
+  };
+
+  const allDone =
+    assignees.length > 0 && assignees.every((item) => item.status === "done");
 
   await updateDoc(doc(db, TASKS_COLLECTION, taskId), {
-    completed: true,
-
-    status: "completed",
-
-    completedAt: serverTimestamp(),
-
+    assignees,
+    status: allDone ? "completed" : "pending",
     updatedAt: serverTimestamp(),
   });
 
-  return getTask(taskId);
+  return await getTask(taskId);
 }
+
+export const completeTask = completeTaskForCurrentUser;
 
 // ============================================================
 // TASK STATUS
@@ -769,122 +877,125 @@ export function calculateTaskStatus(task) {
     return "pending";
   }
 
-  // Completed
-  if (task.completed === true || task.status === "completed") {
+  const assignment = assignmentForCurrentUser(task);
+
+  if (assignment?.status === "done" || assignment?.completedAt) {
     return "completed";
   }
 
-  // New assignee model
-  if (Array.isArray(task.assignees)) {
-    const currentUserId = auth.currentUser?.uid;
-
-    if (currentUserId) {
-      const assignment = task.assignees.find(
-        (person) => person.uid === currentUserId,
-      );
-
-      if (assignment?.status === "done") {
-        return "completed";
-      }
-    }
+  if (task.status === "completed") {
+    return "completed";
   }
 
-  const deadline = timestampToDate(task.deadline);
+  const deadline = toDate(task.deadline);
 
-  if (!deadline && task.dueDate && task.dueTime) {
-    const parsed = new Date(`${task.dueDate}T${task.dueTime}`);
-
-    if (!Number.isNaN(parsed.getTime())) {
-      if (Date.now() > parsed.getTime()) {
-        return "expired";
-      }
-    }
-  } else if (deadline) {
-    if (Date.now() > deadline.getTime()) {
-      return "expired";
-    }
+  if (deadline && Date.now() > deadline.getTime()) {
+    return "expired";
   }
 
   return "pending";
 }
 
-// ============================================================
-// DATE CONVERTER
-// ============================================================
+export function getAssignmentStatus(task, assignment) {
+  if (assignment?.status === "done" || assignment?.completedAt) {
+    return "done";
+  }
 
-export function convertFirebaseDate(value) {
-  return timestampToDate(value);
+  const deadline = toDate(task?.deadline);
+
+  if (deadline && Date.now() > deadline.getTime()) {
+    return "overdue";
+  }
+
+  return "pending";
+}
+
+export function isTaskOverdue(task) {
+  return calculateTaskStatus(task) === "expired";
+}
+
+export function getTaskStats(task) {
+  const assignees = Array.isArray(task?.assignees) ? task.assignees : [];
+
+  let completed = 0;
+  let pending = 0;
+  let overdue = 0;
+
+  for (const assignment of assignees) {
+    const status = getAssignmentStatus(task, assignment);
+
+    if (status === "done") {
+      completed++;
+    } else if (status === "overdue") {
+      overdue++;
+    } else {
+      pending++;
+    }
+  }
+
+  return {
+    total: assignees.length,
+    completed,
+    pending,
+    overdue,
+  };
 }
 
 // ============================================================
-// SCHEDULE
+// SCHEDULING
 // ============================================================
 
 export function createSchedule({
-  users,
+  users = [],
   date,
   startTime = "09:00",
   endTime = "21:00",
 }) {
-  const activeUsers = users.filter(
-    (user) => user.active !== false && user.receiveTasks !== false,
+  const eligible = users.filter(
+    (user) =>
+      user.role === "employee" &&
+      user.active !== false &&
+      user.receiveTasks !== false &&
+      user.showTasks !== false,
   );
 
-  if (!activeUsers.length) {
+  if (!eligible.length) {
     return [];
   }
 
-  const start = parseTime(startTime);
+  const start = parseTimeToMinutes(startTime);
 
-  const end = parseTime(endTime);
+  const end = parseTimeToMinutes(endTime);
 
   if (start === null || end === null || end <= start) {
     throw new Error("وقت البداية والنهاية غير صحيح.");
   }
 
-  const interval =
-    activeUsers.length === 1 ? 0 : (end - start) / (activeUsers.length - 1);
+  const total = end - start;
 
-  return activeUsers.map((user, index) => {
+  const interval = eligible.length === 1 ? 0 : total / (eligible.length - 1);
+
+  return eligible.map((user, index) => {
     const minutes = Math.round(start + interval * index);
 
     return {
-      uid: user.uid || user.id,
-
+      uid: user.uid,
       name: user.name,
-
       scheduledAt: `${date}T${minutesToTime(minutes)}`,
-
       status: "pending",
-
       completedAt: null,
     };
   });
 }
 
-function parseTime(time) {
-  if (typeof time !== "string") {
+function parseTimeToMinutes(time) {
+  if (typeof time !== "string" || !/^\d{2}:\d{2}$/.test(time)) {
     return null;
   }
 
-  const parts = time.split(":");
+  const [hours, minutes] = time.split(":").map(Number);
 
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  const hours = Number(parts[0]);
-
-  const minutes = Number(parts[1]);
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    hours < 0 ||
-    hours > 23 ||
-    minutes < 0 ||
-    minutes > 59
-  ) {
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
     return null;
   }
 
@@ -896,9 +1007,7 @@ function minutesToTime(minutes) {
 
   const mins = minutes % 60;
 
-  return (
-    `${String(hours).padStart(2, "0")}:` + `${String(mins).padStart(2, "0")}`
-  );
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
 // ============================================================
@@ -906,12 +1015,10 @@ function minutesToTime(minutes) {
 // ============================================================
 
 export async function getDashboardStats() {
-  const users = await getUsers();
+  const [users, tasks] = await Promise.all([getUsers(), getTasks()]);
 
-  const tasks = await getTasks();
-
-  let completed = 0;
   let pending = 0;
+  let completed = 0;
   let expired = 0;
 
   tasks.forEach((task) => {
@@ -927,21 +1034,16 @@ export async function getDashboardStats() {
   });
 
   return {
-    users: users.length,
+    totalTasks: tasks.length,
+    pendingTasks: pending,
+    completedTasks: completed,
+    expiredTasks: expired,
 
-    employees: users.filter((user) => user.role === "employee").length,
+    totalUsers: users.length,
 
-    admins: users.filter((user) => user.role === "admin").length,
-
-    activeUsers: users.filter((user) => user.active !== false).length,
-
-    tasks: tasks.length,
-
-    completed,
-
-    pending,
-
-    expired,
+    activeEmployees: users.filter(
+      (user) => user.role === "employee" && user.active !== false,
+    ).length,
   };
 }
 
@@ -949,64 +1051,36 @@ export async function getDashboardStats() {
 // DATE HELPERS
 // ============================================================
 
-export function formatDate(value, locale = "en-US") {
-  const date = timestampToDate(value);
+export function convertFirebaseDate(value) {
+  return toDate(value);
+}
+
+export function formatDate(value) {
+  const date = toDate(value);
 
   if (!date) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
+  }).format(date);
+}
+
+export function formatTime(value) {
+  const date = toDate(value);
+
+  if (!date) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
     timeStyle: "short",
   }).format(date);
 }
 
-export function formatTime(value, locale = "en-US") {
-  const date = timestampToDate(value);
+export function toISO(value) {
+  const date = toDate(value);
 
-  if (!date) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat(locale, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return date ? date.toISOString() : null;
 }
-
-function formatDateForInput(value) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const year = date.getFullYear();
-
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatTimeForInput(value) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const hours = String(date.getHours()).padStart(2, "0");
-
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-
-  return `${hours}:${minutes}`;
-}
-
-// ============================================================
-// EXPORTS
-// ============================================================
-
-export { auth, db, app, secondaryAuth };
