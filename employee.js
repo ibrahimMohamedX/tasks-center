@@ -6,7 +6,6 @@
 // This file does NOT communicate with Firebase directly.
 // All Firebase operations go through firebase.js.
 // ============================================================
-
 import {
   getCurrentAuthUser,
   listenToAuthState,
@@ -18,7 +17,6 @@ import {
   calculateTaskStatus,
   convertFirebaseDate,
 } from "./firebase.js";
-
 // ============================================================
 // STATE
 // ============================================================
@@ -123,18 +121,248 @@ function initialize() {
   setupModal();
 
   setupActions();
-
+  createEmployeeLoginScreen();
   listenToAuthentication();
 }
 
 // ============================================================
 // AUTH
 // ============================================================
+function createEmployeeLoginScreen() {
+  if (document.getElementById("employeeLoginGate")) {
+    return;
+  }
 
+  const gate = document.createElement("div");
+
+  gate.id = "employeeLoginGate";
+
+  gate.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      background:#0b0d10;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      font-family:Arial,sans-serif;
+    ">
+
+      <div style="
+        width:100%;
+        max-width:420px;
+        background:#15181d;
+        border:1px solid rgba(255,255,255,.08);
+        border-radius:20px;
+        padding:32px;
+        box-shadow:0 25px 80px rgba(0,0,0,.45);
+      ">
+
+        <div style="
+          text-align:center;
+          margin-bottom:28px;
+        ">
+
+          <div style="
+            width:54px;
+            height:54px;
+            margin:0 auto 16px;
+            border-radius:16px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#fff;
+            color:#111;
+            font-size:22px;
+            font-weight:700;
+          ">
+            A
+          </div>
+
+          <h1 style="
+            margin:0 0 8px;
+            color:#fff;
+            font-size:25px;
+          ">
+            Employee Login
+          </h1>
+
+          <p style="
+            margin:0;
+            color:#8e959f;
+            font-size:14px;
+          ">
+            Sign in to Tasks Center
+          </p>
+
+        </div>
+
+
+        <form id="employeeLoginForm">
+
+          <div style="margin-bottom:16px">
+
+            <label style="
+              display:block;
+              color:#c8cdd4;
+              font-size:13px;
+              margin-bottom:8px;
+            ">
+              Email
+            </label>
+
+            <input
+              id="employeeLoginEmail"
+              type="email"
+              autocomplete="username"
+              required
+              placeholder="employee@example.com"
+              style="
+                width:100%;
+                box-sizing:border-box;
+                padding:13px 14px;
+                border-radius:10px;
+                border:1px solid #2b3038;
+                background:#0f1115;
+                color:#fff;
+                outline:none;
+              "
+            />
+
+          </div>
+
+
+          <div style="margin-bottom:20px">
+
+            <label style="
+              display:block;
+              color:#c8cdd4;
+              font-size:13px;
+              margin-bottom:8px;
+            ">
+              Password
+            </label>
+
+            <input
+              id="employeeLoginPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              placeholder="••••••••"
+              style="
+                width:100%;
+                box-sizing:border-box;
+                padding:13px 14px;
+                border-radius:10px;
+                border:1px solid #2b3038;
+                background:#0f1115;
+                color:#fff;
+                outline:none;
+              "
+            />
+
+          </div>
+
+
+          <div
+            id="employeeLoginError"
+            style="
+              display:none;
+              margin-bottom:16px;
+              padding:12px;
+              border-radius:10px;
+              background:rgba(239,68,68,.1);
+              color:#f87171;
+              font-size:13px;
+            "
+          ></div>
+
+
+          <button
+            type="submit"
+            id="employeeLoginButton"
+            style="
+              width:100%;
+              border:0;
+              border-radius:10px;
+              padding:13px;
+              background:#fff;
+              color:#111;
+              font-size:14px;
+              font-weight:700;
+              cursor:pointer;
+            "
+          >
+            Sign In
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(gate);
+
+  document
+    .getElementById("employeeLoginForm")
+    .addEventListener("submit", handleEmployeeLogin);
+}
+
+async function handleEmployeeLogin(event) {
+  event.preventDefault();
+
+  const email = document.getElementById("employeeLoginEmail").value.trim();
+
+  const password = document.getElementById("employeeLoginPassword").value;
+
+  const button = document.getElementById("employeeLoginButton");
+
+  const error = document.getElementById("employeeLoginError");
+
+  error.style.display = "none";
+
+  button.disabled = true;
+
+  button.textContent = "Signing in...";
+
+  try {
+    const { login } = await import("./firebase.js");
+
+    await login(email, password);
+  } catch (err) {
+    console.error("Employee login error:", err);
+
+    error.textContent = getReadableError(err);
+
+    error.style.display = "block";
+
+    button.disabled = false;
+
+    button.textContent = "Sign In";
+  }
+}
+
+function hideEmployeeLoginScreen() {
+  const gate = document.getElementById("employeeLoginGate");
+
+  if (gate) {
+    gate.remove();
+  }
+}
 function listenToAuthentication() {
+  createEmployeeLoginScreen();
+
   listenToAuthState(async (user) => {
     if (!user) {
-      handleUnauthenticatedUser();
+      state.authUser = null;
+
+      state.profile = null;
+
+      createEmployeeLoginScreen();
 
       return;
     }
@@ -166,6 +394,27 @@ async function initializeEmployee(userId) {
     }
 
     state.profile = profile;
+    if (profile.active === false) {
+      showToast("Account Disabled", "Your account has been disabled.", "error");
+
+      await logoutUser();
+
+      return;
+    }
+
+    if (profile.role !== "employee") {
+      showToast(
+        "Access denied",
+        "This account is not an employee account.",
+        "error",
+      );
+
+      await logoutUser();
+
+      return;
+    }
+
+    hideEmployeeLoginScreen();
 
     // -----------------------------------------------
     // Update UI

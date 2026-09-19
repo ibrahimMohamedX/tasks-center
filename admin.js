@@ -1,10 +1,5 @@
 // ============================================================
 // admin.js
-// Admin UI / Page Logic
-//
-// IMPORTANT:
-// No Firebase SDK is imported here.
-// All Firebase communication goes through firebase.js.
 // ============================================================
 
 import {
@@ -16,6 +11,8 @@ import {
   createTask,
   calculateTaskStatus,
   convertFirebaseDate,
+  createUser,
+  updateUser,
 } from "./firebase.js";
 
 // ============================================================
@@ -24,20 +21,324 @@ import {
 
 const state = {
   authUser: null,
-
   profile: null,
-
   users: [],
-
   tasks: [],
-
   taskFilter: "all",
-
   taskUserFilter: "all",
-
   loading: false,
+  loginVisible: false,
 };
 
+// ============================================================
+// LOGIN GATE
+// ============================================================
+
+function createAdminLoginScreen() {
+  if (document.getElementById("adminLoginGate")) {
+    return;
+  }
+
+  const gate = document.createElement("div");
+
+  gate.id = "adminLoginGate";
+
+  gate.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      background:#0b0d10;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      font-family:Arial,sans-serif;
+    ">
+
+      <div style="
+        width:100%;
+        max-width:420px;
+        background:#15181d;
+        border:1px solid rgba(255,255,255,.08);
+        border-radius:20px;
+        padding:32px;
+        box-shadow:0 25px 80px rgba(0,0,0,.45);
+      ">
+
+        <div style="
+          margin-bottom:28px;
+          text-align:center;
+        ">
+
+          <div style="
+            width:54px;
+            height:54px;
+            margin:0 auto 16px;
+            border-radius:16px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#fff;
+            color:#111;
+            font-size:22px;
+            font-weight:700;
+          ">
+            A
+          </div>
+
+          <h1 style="
+            margin:0 0 8px;
+            color:#fff;
+            font-size:25px;
+          ">
+            Admin Login
+          </h1>
+
+          <p style="
+            margin:0;
+            color:#8e959f;
+            font-size:14px;
+          ">
+            Sign in to Tasks Center
+          </p>
+
+        </div>
+
+
+        <form id="adminLoginForm">
+
+          <div style="margin-bottom:16px">
+
+            <label style="
+              display:block;
+              color:#c8cdd4;
+              font-size:13px;
+              margin-bottom:8px;
+            ">
+              Email
+            </label>
+
+            <input
+              id="adminLoginEmail"
+              type="email"
+              autocomplete="username"
+              required
+              placeholder="admin@example.com"
+              style="
+                width:100%;
+                box-sizing:border-box;
+                padding:13px 14px;
+                border-radius:10px;
+                border:1px solid #2b3038;
+                background:#0f1115;
+                color:#fff;
+                outline:none;
+              "
+            />
+
+          </div>
+
+
+          <div style="margin-bottom:20px">
+
+            <label style="
+              display:block;
+              color:#c8cdd4;
+              font-size:13px;
+              margin-bottom:8px;
+            ">
+              Password
+            </label>
+
+            <input
+              id="adminLoginPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              placeholder="••••••••"
+              style="
+                width:100%;
+                box-sizing:border-box;
+                padding:13px 14px;
+                border-radius:10px;
+                border:1px solid #2b3038;
+                background:#0f1115;
+                color:#fff;
+                outline:none;
+              "
+            />
+
+          </div>
+
+
+          <div
+            id="adminLoginError"
+            style="
+              display:none;
+              margin-bottom:16px;
+              padding:12px;
+              border-radius:10px;
+              background:rgba(239,68,68,.1);
+              color:#f87171;
+              font-size:13px;
+            "
+          ></div>
+
+
+          <button
+            type="submit"
+            id="adminLoginButton"
+            style="
+              width:100%;
+              border:0;
+              border-radius:10px;
+              padding:13px;
+              background:#fff;
+              color:#111;
+              font-size:14px;
+              font-weight:700;
+              cursor:pointer;
+            "
+          >
+            Sign In
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+  `;
+
+  document.body.appendChild(gate);
+
+  document
+    .getElementById("adminLoginForm")
+    .addEventListener("submit", handleAdminLogin);
+}
+
+async function handleAdminLogin(event) {
+  event.preventDefault();
+
+  const email = document.getElementById("adminLoginEmail").value.trim();
+
+  const password = document.getElementById("adminLoginPassword").value;
+
+  const button = document.getElementById("adminLoginButton");
+
+  const error = document.getElementById("adminLoginError");
+
+  error.style.display = "none";
+
+  button.disabled = true;
+
+  button.textContent = "Signing in...";
+
+  try {
+    const { login } = await import("./firebase.js");
+
+    await login(email, password);
+  } catch (err) {
+    console.error("Admin login error:", err);
+
+    error.textContent = getReadableError(err);
+
+    error.style.display = "block";
+
+    button.disabled = false;
+
+    button.textContent = "Sign In";
+  }
+}
+
+function hideAdminLoginScreen() {
+  const gate = document.getElementById("adminLoginGate");
+
+  if (gate) {
+    gate.remove();
+  }
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+function listenToAuthentication() {
+  createAdminLoginScreen();
+
+  listenToAuthState(async (user) => {
+    if (!user) {
+      state.authUser = null;
+
+      state.profile = null;
+
+      state.loginVisible = true;
+
+      createAdminLoginScreen();
+
+      return;
+    }
+
+    state.authUser = user;
+
+    try {
+      await initializeAdmin(user.uid);
+    } catch (error) {
+      console.error("Admin auth initialization error:", error);
+    }
+  });
+}
+
+async function initializeAdmin(userId) {
+  try {
+    setLoading(true);
+
+    const profile = await getUser(userId);
+
+    if (!profile) {
+      showToast("Account Error", "Admin profile was not found.", "error");
+
+      await logoutUser();
+
+      return;
+    }
+
+    state.profile = profile;
+
+    if (profile.active === false) {
+      showToast("Account Disabled", "This account has been disabled.", "error");
+
+      await logoutUser();
+
+      return;
+    }
+
+    if (profile.role !== "admin") {
+      showToast(
+        "Access denied",
+        "This account is not an administrator.",
+        "error",
+      );
+
+      await logoutUser();
+
+      return;
+    }
+
+    hideAdminLoginScreen();
+
+    renderProfile();
+
+    await loadData();
+  } catch (error) {
+    console.error("Admin initialization error:", error);
+
+    showToast("Error", getReadableError(error), "error");
+  } finally {
+    setLoading(false);
+  }
+}
 // ============================================================
 // DOM
 // ============================================================
