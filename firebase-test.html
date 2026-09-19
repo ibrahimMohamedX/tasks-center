@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Firebase Test</title>
+  </head>
+
+  <body>
+    <h1>Firebase Test</h1>
+
+    <button id="loginBtn">Test Login</button>
+
+    <button id="profileBtn">Get Profile</button>
+
+    <button id="logoutBtn">Logout</button>
+
+    <pre id="output"></pre>
+
+    <script type="module">
+      import {
+        login,
+        logout,
+        getCurrentUserProfile,
+        getFirebaseUser,
+      } from "./firebase.js";
+
+      const output = document.getElementById("output");
+
+      function log(message) {
+        output.textContent += message + "\n";
+      }
+
+      document
+        .getElementById("loginBtn")
+        .addEventListener("click", async () => {
+          try {
+            const user = await login("Admin@gmail.com", "12345678");
+
+            log("LOGIN SUCCESS");
+
+            log("UID: " + user.uid);
+
+            log("Email: " + user.email);
+          } catch (error) {
+            console.error(error);
+
+            log("LOGIN ERROR: " + error.message);
+          }
+        });
+
+      document
+        .getElementById("profileBtn")
+        .addEventListener("click", async () => {
+          try {
+            const profile = await getCurrentUserProfile();
+
+            console.log(profile);
+
+            log("PROFILE SUCCESS");
+
+            log(JSON.stringify(profile, null, 2));
+          } catch (error) {
+            console.error(error);
+
+            log("PROFILE ERROR: " + error.message);
+          }
+        });
+
+      document
+        .getElementById("logoutBtn")
+        .addEventListener("click", async () => {
+          try {
+            await logout();
+
+            log("LOGOUT SUCCESS");
+          } catch (error) {
+            console.error(error);
+
+            log("LOGOUT ERROR: " + error.message);
+          }
+        });
+    </script>
+  </body>
+</html>

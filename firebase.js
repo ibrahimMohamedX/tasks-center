@@ -55,17 +55,19 @@ import {
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyAreXF_U51NYnqtLHZ37vU41b9Rv3M00gs",
 
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  authDomain: "archai-tasks-manager.firebaseapp.com",
 
-  projectId: "YOUR_PROJECT_ID",
+  projectId: "archai-tasks-manager",
 
-  storageBucket: "YOUR_PROJECT.firebasestorage.app",
+  storageBucket: "archai-tasks-manager.firebasestorage.app",
 
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  messagingSenderId: "127267057347",
 
-  appId: "YOUR_APP_ID",
+  appId: "1:127267057347:web:edb04505a80eba36d47c76",
+
+  measurementId: "G-ZFW35C5NDE",
 };
 
 // ============================================================
