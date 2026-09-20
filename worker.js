@@ -193,6 +193,93 @@ export default {
         });
       }
 
+      if (url.pathname === "/send-test-notification") {
+        const serviceAccount = await getFirebaseServiceAccount(env);
+
+        const accessToken = await createGoogleAccessToken(serviceAccount);
+
+        const documents = await getFirestoreDocuments(
+          accessToken,
+          env.FIREBASE_PROJECT_ID,
+          "fcmTokens",
+        );
+
+        const activeTokens = documents
+          .map((document) => {
+            const fields = document.fields || {};
+
+            return {
+              token: getFirestoreFieldValue(fields, "token"),
+
+              uid: getFirestoreFieldValue(fields, "uid"),
+
+              userName: getFirestoreFieldValue(fields, "userName"),
+
+              active: getFirestoreFieldValue(fields, "active"),
+            };
+          })
+          .filter((item) => item.active === true && item.token);
+
+        if (activeTokens.length === 0) {
+          return Response.json(
+            {
+              ok: false,
+              error: "No active FCM tokens found.",
+            },
+            {
+              status: 404,
+            },
+          );
+        }
+
+        const target = activeTokens[0];
+
+        const fcmUrl =
+          `https://fcm.googleapis.com/v1/projects/` +
+          `${env.FIREBASE_PROJECT_ID}/messages:send`;
+
+        const fcmResponse = await fetch(fcmUrl, {
+          method: "POST",
+
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            message: {
+              token: target.token,
+
+              notification: {
+                title: "Cloudflare FCM Test 🔔",
+                body: "Cloudflare Worker is successfully sending notifications!",
+              },
+
+              data: {
+                type: "cloudflare_test",
+                title: "Cloudflare FCM Test 🔔",
+                body: "Cloudflare Worker is successfully sending notifications!",
+              },
+            },
+          }),
+        });
+
+        const fcmData = await fcmResponse.json();
+
+        if (!fcmResponse.ok) {
+          throw new Error(`FCM error: ${JSON.stringify(fcmData)}`);
+        }
+
+        return Response.json({
+          ok: true,
+          sent: true,
+          userName: target.userName || null,
+          uid: target.uid || null,
+          messageName: fcmData.name || null,
+        });
+      }
+
       if (url.pathname === "/firebase-test") {
         const serviceAccount = await getFirebaseServiceAccount(env);
 
