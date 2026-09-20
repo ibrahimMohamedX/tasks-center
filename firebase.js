@@ -1451,9 +1451,6 @@ export async function claimMention(mentionId) {
 }
 
 export async function completeMention(mentionId) {
-  const cooldownUntil = Timestamp.fromMillis(
-    Date.now() + mention.lockDurationMinutes * 60 * 1000,
-  );
   const authUser = requireAuth();
 
   const profile = await getUserById(authUser.uid);

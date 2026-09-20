@@ -1819,7 +1819,6 @@ function setupActions() {
   el.logoutButton?.addEventListener("click", async () => {
     try {
       await logoutUser();
-
       window.location.replace("login.html");
     } catch (error) {
       console.error("Logout error:", error);
@@ -1857,27 +1856,25 @@ function setupActions() {
       return;
     }
 
-    document.addEventListener("click", (event) => {
-      const completeButton = event.target.closest("[data-complete-mention]");
+    const detailsButton = event.target.closest("[data-open-mention-details]");
 
-      if (completeButton) {
-        handleCompleteMention(completeButton.dataset.completeMention);
+    if (detailsButton) {
+      openMentionDetails(detailsButton.dataset.openMentionDetails);
 
-        return;
-      }
+      return;
+    }
 
-      const detailsButton = event.target.closest("[data-open-mention-details]");
+    const reactivateButton = event.target.closest("[data-reactivate-mention]");
 
-      if (detailsButton) {
-        openMentionDetails(detailsButton.dataset.openMentionDetails);
+    if (reactivateButton) {
+      const mentionId = reactivateButton.dataset.reactivateMention;
 
-        return;
-      }
+      const minutes = Number(reactivateButton.dataset.extraTime || 240);
 
-      const reactivateButton = event.target.closest(
-        "[data-reactivate-mention]",
-      );
-    });
+      handleReactivateMention(mentionId, minutes);
+
+      return;
+    }
   });
 }
 
