@@ -2166,3 +2166,155 @@ a {
     margin-left: 0 !important;
   }
 }
+/* ============================================================
+   COMPACT MENTION CARDS
+   ============================================================ */
+
+.mentions-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mention-card {
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.mention-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.mention-card-header {
+  gap: 10px;
+}
+
+.mention-type {
+  font-size: 10px;
+  gap: 5px;
+}
+
+.mention-card h3 {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.35;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  max-width: 100%;
+}
+
+.mention-description {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+.mention-status-badge {
+  padding: 4px 8px;
+  font-size: 9px;
+}
+
+.mention-compact-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mention-compact-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  min-width: 0;
+}
+
+.mention-compact-meta i {
+  font-size: 9px;
+}
+
+.mention-compact-countdown {
+  color: #c2410c;
+}
+
+.mention-compact-open {
+  color: #047857;
+}
+
+.mention-compact-expired {
+  color: #b91c1c;
+}
+
+.mention-compact-completed {
+  color: #1d4ed8;
+}
+
+.mention-card-footer {
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+
+  gap: 8px;
+}
+
+.mention-queue-summary {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mention-actions {
+  gap: 5px;
+}
+
+.primary-button.small,
+.secondary-button.small {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .mentions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .mentions-grid {
+    gap: 10px;
+  }
+
+  .mention-card {
+    padding: 12px;
+  }
+
+  .mention-card-footer {
+    align-items: center;
+  }
+
+  .mention-actions {
+    width: auto;
+  }
+
+  .mention-actions button {
+    flex: none;
+  }
+}

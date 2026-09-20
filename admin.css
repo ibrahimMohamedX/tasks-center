@@ -1674,195 +1674,336 @@ tbody tr:last-child td {
   }
 }
 /* ============================================================
-   MENTIONS
-============================================================ */
-
-.mention-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.mention-settings-card {
-  margin-bottom: 24px;
-}
-.section-card {
-  margin-bottom: 24px;
-}
-
-.mention-settings-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  padding: 20px;
-}
-
-.mention-settings-form .form-group {
-  flex: 1;
-  margin: 0;
-}
+   COMPACT MENTIONS
+   ============================================================ */
 
 .mentions-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  padding: 20px;
+  gap: 10px;
 }
+
+/* Card */
 
 .mention-card {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 11px 12px;
+
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 18px;
+  border-radius: 12px;
+
   background: var(--card-bg, #ffffff);
-  padding: 20px;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+
+  overflow: hidden;
 }
 
-.mention-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
-}
+/* Top */
 
-.mention-card-header {
+.mention-card-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+
+  gap: 8px;
+
+  min-width: 0;
+}
+
+/* Title */
+
+.mention-card-title {
+  min-width: 0;
+  flex: 1;
 }
 
 .mention-type {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 7px;
+
+  gap: 4px;
+
+  margin: 0;
+
   color: #6b7280;
-  font-size: 12px;
+
+  font-size: 9px;
   font-weight: 700;
+
   text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
-.mention-card h3 {
-  margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+.mention-card-title h3 {
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+
+  margin: 3px 0 0;
+
+  font-size: 12px;
+  line-height: 1.3;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.mention-description {
-  margin: 14px 0 0;
-  color: #6b7280;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
+/* Badge */
 
 .mention-status-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
+  flex-shrink: 0;
+
+  padding: 4px 7px;
+
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+
+  font-size: 8px;
+  line-height: 1;
 }
 
-.mention-status-badge.locked {
-  background: #fff7ed;
+/* Info */
+
+.mention-card-info {
+  display: flex;
+  align-items: center;
+
+  gap: 6px 10px;
+
+  margin-top: 8px;
+
+  min-width: 0;
+
+  color: #6b7280;
+
+  font-size: 9px;
+  line-height: 1.2;
+
+  overflow: hidden;
+}
+
+.mention-card-info > span {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 3px;
+
+  min-width: 0;
+
+  white-space: nowrap;
+}
+
+.mention-card-info i {
+  flex-shrink: 0;
+
+  font-size: 8px;
+}
+
+.mention-card-info > span:not(:last-child)::after {
+  content: "•";
+
+  margin-left: 4px;
+
+  color: #d1d5db;
+}
+
+.mention-card-time {
   color: #c2410c;
 }
 
-.mention-status-badge.open {
-  background: #ecfdf5;
-  color: #047857;
-}
+/* Bottom */
 
-.mention-status-badge.expired {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.mention-status-badge.completed {
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.mention-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.mention-meta-grid > div,
-.mention-details-grid > div {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mention-meta-grid span,
-.mention-details-grid span,
-.mention-detail-url > span {
-  color: #9ca3af;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.mention-meta-grid strong,
-.mention-details-grid strong {
-  font-size: 13px;
-  color: #111827;
-}
-
-.mention-status-line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #f1f5f9;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.mention-status-line > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mention-open-text {
-  color: #047857;
-}
-
-.mention-card-footer {
+.mention-card-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 18px;
-  color: #6b7280;
-  font-size: 12px;
+
+  gap: 8px;
+
+  margin-top: 9px;
+  padding-top: 8px;
+
+  border-top: 1px solid #f1f5f9;
 }
 
-.mention-actions {
+/* Progress */
+
+.mention-card-progress {
+  min-width: 0;
+
+  color: #9ca3af;
+
+  font-size: 9px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions */
+
+.mention-card-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+
+  gap: 5px;
+
+  flex-shrink: 0;
 }
 
-.primary-button.small,
-.secondary-button.small {
-  min-height: 36px;
-  padding: 8px 12px;
-  font-size: 12px;
+/* Compact buttons */
+
+.mention-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  height: 27px;
+
+  padding: 0 8px;
+
+  border-radius: 7px;
+
+  border: 1px solid transparent;
+
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+
+  cursor: pointer;
+}
+
+.mention-action-primary {
+  background: #111827;
+  color: #ffffff;
+}
+
+.mention-action-secondary {
+  background: #ffffff;
+  color: #374151;
+
+  border-color: #e5e7eb;
+}
+
+/* Employee personal state */
+
+.mention-personal-state.compact {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 4px;
+
+  height: 27px;
+
+  padding: 0 7px;
+
+  border-radius: 7px;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .mentions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mention-card {
+    padding: 10px;
+  }
+
+  .mention-card-info {
+    gap: 5px 7px;
+  }
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 650px) {
+  .mentions-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mention-card {
+    padding: 10px 11px;
+  }
+
+  .mention-card-top {
+    gap: 6px;
+  }
+
+  .mention-card-title h3 {
+    font-size: 12px;
+  }
+
+  .mention-card-info {
+    gap: 5px 8px;
+
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .mention-card-info::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mention-card-bottom {
+    gap: 6px;
+  }
+
+  .mention-card-actions {
+    flex-shrink: 0;
+  }
+}
+
+/* ============================================================
+   SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+  .mention-card {
+    padding: 9px;
+  }
+
+  .mention-type {
+    font-size: 8px;
+  }
+
+  .mention-card-title h3 {
+    font-size: 11px;
+  }
+
+  .mention-card-info {
+    font-size: 8px;
+  }
+
+  .mention-card-progress {
+    font-size: 8px;
+  }
+
+  .mention-action {
+    height: 25px;
+
+    padding: 0 6px;
+
+    font-size: 8px;
+  }
 }
 
 .modal-large {
@@ -2146,5 +2287,339 @@ tbody tr:last-child td {
   .main-content {
     width: 100%;
     margin-left: 0 !important;
+  }
+}
+
+/* ============================================================
+   MENTION CARDS — COMPACT & RESPONSIVE
+   ============================================================ */
+
+.mentions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+/* Card */
+.mention-card {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  padding: 14px;
+  border-radius: 12px;
+
+  overflow: hidden;
+}
+
+/* Header */
+.mention-card .mention-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  min-width: 0;
+}
+
+.mention-card .mention-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Type */
+.mention-card .mention-type {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin: 0 0 4px;
+
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+/* URL / Title */
+.mention-card .mention-main h3 {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  margin: 0;
+
+  font-size: 13px;
+  line-height: 1.35;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status */
+.mention-card .mention-status-badge {
+  flex: 0 0 auto;
+
+  padding: 4px 7px;
+
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Description */
+.mention-card .mention-description {
+  width: 100%;
+  min-width: 0;
+
+  margin: 8px 0 0;
+
+  font-size: 11px;
+  line-height: 1.4;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+
+  overflow: hidden;
+}
+
+/* Compact metadata */
+.mention-card .mention-compact-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 5px 10px;
+
+  width: 100%;
+  min-width: 0;
+
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.mention-card .mention-compact-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  min-width: 0;
+
+  white-space: nowrap;
+}
+
+.mention-card .mention-compact-meta i {
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+/* Status colors */
+.mention-card .mention-compact-countdown {
+  color: #c2410c;
+}
+
+.mention-card .mention-compact-open {
+  color: #047857;
+}
+
+.mention-card .mention-compact-expired {
+  color: #b91c1c;
+}
+
+.mention-card .mention-compact-completed {
+  color: #1d4ed8;
+}
+
+/* Footer */
+.mention-card .mention-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  width: 100%;
+  min-width: 0;
+
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Queue summary */
+.mention-card .mention-queue-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  font-size: 10px;
+  line-height: 1.2;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions */
+.mention-card .mention-actions {
+  display: flex;
+  align-items: center;
+
+  flex: 0 0 auto;
+
+  gap: 5px;
+
+  min-width: 0;
+}
+
+/*
+   IMPORTANT:
+   لا نعدل .primary-button.small أو
+   .secondary-button.small بشكل عام.
+   التعديل هنا scoped للكارت فقط.
+*/
+.mention-card .mention-actions .primary-button.small,
+.mention-card .mention-actions .secondary-button.small {
+  flex: 0 0 auto;
+
+  min-height: 30px;
+  padding: 5px 9px;
+
+  font-size: 10px;
+  line-height: 1;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .mentions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mention-card {
+    padding: 12px;
+  }
+
+  .mention-card .mention-card-header {
+    gap: 7px;
+  }
+
+  .mention-card .mention-status-badge {
+    font-size: 8px;
+    padding: 4px 6px;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 5px 8px;
+  }
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .mentions-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .mention-card {
+    width: 100%;
+    max-width: 100%;
+
+    padding: 12px;
+  }
+
+  .mention-card .mention-card-header {
+    align-items: flex-start;
+  }
+
+  .mention-card .mention-main {
+    min-width: 0;
+  }
+
+  .mention-card .mention-main h3 {
+    font-size: 12px;
+  }
+
+  .mention-card .mention-description {
+    font-size: 10px;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 6px 9px;
+  }
+
+  .mention-card .mention-card-footer {
+    align-items: center;
+  }
+
+  .mention-card .mention-queue-summary {
+    max-width: 45%;
+  }
+
+  .mention-card .mention-actions {
+    max-width: 55%;
+  }
+
+  .mention-card .mention-actions .primary-button.small,
+  .mention-card .mention-actions .secondary-button.small {
+    min-height: 29px;
+    padding: 5px 8px;
+
+    font-size: 9px;
+  }
+}
+
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+  .mention-card {
+    padding: 10px;
+  }
+
+  .mention-card .mention-status-badge {
+    max-width: 75px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 5px 7px;
+    font-size: 9px;
+  }
+
+  .mention-card .mention-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .mention-card .mention-queue-summary {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mention-card .mention-actions {
+    width: 100%;
+    max-width: 100%;
+
+    justify-content: flex-end;
   }
 }

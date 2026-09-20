@@ -1060,140 +1060,124 @@ function createAdminMentionCard(mention) {
 
   const locker = mention.currentLocker?.name || "";
 
-  const isExpired = status === "expired";
+  const currentUid = state.authUser?.uid;
+
+  const claimedByMe = mention.currentLocker?.uid === currentUid;
+
+  const completedByMe = completed.some((item) => item.uid === currentUid);
+
+  let action = "";
+
+  if (claimedByMe && !completedByMe) {
+    action = `
+      <button
+        type="button"
+        class="mention-action mention-action-primary"
+        data-complete-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-check"></i>
+        Complete
+      </button>
+    `;
+  }
+
+  if (status === "expired") {
+    action += `
+      <button
+        type="button"
+        class="mention-action mention-action-primary"
+        data-reactivate-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-rotate"></i>
+        Reactivate
+      </button>
+    `;
+  }
 
   return `
     <article
       class="mention-card"
       data-mention-details="${escapeHtml(mention.id)}"
     >
-      <div class="mention-card-header">
-        <div>
+
+      <div class="mention-card-top">
+
+        <div class="mention-card-title">
+
           <span class="mention-type">
             <i class="fa-solid fa-at"></i>
             Facebook Mention
           </span>
 
-          <h3>
+          <h3 title="${escapeAttribute(mention.url || "")}">
             ${escapeHtml(mention.url || "Unknown URL")}
           </h3>
+
         </div>
 
         ${createMentionStatusBadge(status)}
+
       </div>
 
-      ${
-        mention.description
-          ? `
-            <p class="mention-description">
-              ${escapeHtml(mention.description)}
-            </p>
-          `
-          : ""
-      }
+      <div class="mention-card-info">
 
-      <div class="mention-meta-grid">
-        <div>
-          <span>Created by</span>
-          <strong>
-            ${escapeHtml(mention.createdByName || "Unknown")}
-          </strong>
-        </div>
+        <span>
+          <i class="fa-solid fa-user"></i>
+          ${escapeHtml(mention.createdByName || "Unknown")}
+        </span>
 
-        <div>
-          <span>Created</span>
-          <strong>
-            ${formatDateTime(mention.createdAt)}
-          </strong>
-        </div>
-
-        <div>
-          <span>Participants</span>
-          <strong>
-            ${mention.totalCompleted || 0}
-            /
-            ${mention.totalParticipants || 0}
-          </strong>
-        </div>
-
-        <div>
-          <span>Lock duration</span>
-          <strong>
-            ${formatDuration(mention.lockDurationMinutes * 60 * 1000)}
-          </strong>
-        </div>
-      </div>
-
-      <div class="mention-status-line">
-        ${
-          status === "locked"
-            ? createMentionTimerHtml(mention)
-            : status === "open"
-              ? `
-                <span class="mention-open-text">
-                  <i class="fa-solid fa-circle"></i>
-                  Available now
-                </span>
-              `
-              : status === "expired"
-                ? `
-                  <span>
-                    <i class="fa-solid fa-clock"></i>
-                    Expired
-                  </span>
-                `
-                : `
-                  <span>
-                    <i class="fa-solid fa-check-double"></i>
-                    All participants completed
-                  </span>
-                `
-        }
+        <span>
+          <i class="fa-solid fa-users"></i>
+          ${completed.length}/${mention.totalParticipants || 0}
+        </span>
 
         ${
           locker
             ? `
               <span>
-                <i class="fa-solid fa-user-lock"></i>
+                <i class="fa-solid fa-lock"></i>
                 ${escapeHtml(locker)}
               </span>
             `
             : ""
         }
-      </div>
 
-      <div class="mention-card-footer">
-        <span>
-          ${queue.length} pending
-          ·
-          ${completed.length} completed
+        <span class="mention-card-time">
+          ${
+            status === "locked"
+              ? getMentionCountdownText(mention)
+              : status === "open"
+                ? "Available now"
+                : status === "expired"
+                  ? "Expired"
+                  : "Completed"
+          }
         </span>
 
-        <div class="mention-actions">
+      </div>
+
+      <div class="mention-card-bottom">
+
+        <span class="mention-card-progress">
+          ${queue.length} pending · ${completed.length} completed
+        </span>
+
+        <div class="mention-card-actions">
+
+          ${action}
+
           <button
             type="button"
-            class="secondary-button small"
+            class="mention-action mention-action-secondary"
             data-open-mention-details="${escapeHtml(mention.id)}"
           >
             Details
           </button>
 
-          ${
-            isExpired
-              ? `
-                <button
-                  type="button"
-                  class="primary-button small"
-                  data-reactivate-mention="${escapeHtml(mention.id)}"
-                >
-                  <i class="fa-solid fa-rotate"></i>
-                  Reactivate
-                </button>
-              `
-              : ""
-          }
         </div>
+
       </div>
+
     </article>
   `;
 }
@@ -1684,6 +1668,24 @@ async function handleMentionSettings(event) {
   }
 }
 
+async function handleCompleteMention(mentionId) {
+  try {
+    await completeMention(mentionId);
+
+    showToast("Mention completed", "Your participation has been recorded.");
+
+    await loadMentionAnalytics();
+  } catch (error) {
+    console.error("Complete Mention error:", error);
+
+    showToast(
+      "Unable to complete Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  }
+}
+
 async function handleReactivateMention(mentionId, minutes) {
   const labels = {
     120: "2 hours",
@@ -1722,6 +1724,24 @@ async function handleReactivateMention(mentionId, minutes) {
     );
   }
 }
+
+// async function handleCompleteMention(mentionId) {
+//   try {
+//     await completeMention(mentionId);
+
+//     showToast("Mention completed", "Your participation has been recorded.");
+
+//     await loadMentionAnalytics();
+//   } catch (error) {
+//     console.error("Complete Mention error:", error);
+
+//     showToast(
+//       "Unable to complete Mention",
+//       getReadableFirebaseError(error),
+//       "error",
+//     );
+//   }
+// }
 
 // ============================================================
 // NAVIGATION
@@ -1829,23 +1849,35 @@ function setupActions() {
   });
 
   document.addEventListener("click", (event) => {
-    const detailsButton = event.target.closest("[data-open-mention-details]");
+    const completeButton = event.target.closest("[data-complete-mention]");
 
-    if (detailsButton) {
-      openMentionDetails(detailsButton.dataset.openMentionDetails);
+    if (completeButton) {
+      handleCompleteMention(completeButton.dataset.completeMention);
 
       return;
     }
 
-    const reactivateButton = event.target.closest("[data-reactivate-mention]");
+    document.addEventListener("click", (event) => {
+      const completeButton = event.target.closest("[data-complete-mention]");
 
-    if (reactivateButton) {
-      const mentionId = reactivateButton.dataset.reactivateMention;
+      if (completeButton) {
+        handleCompleteMention(completeButton.dataset.completeMention);
 
-      const minutes = Number(reactivateButton.dataset.extraTime || 240);
+        return;
+      }
 
-      handleReactivateMention(mentionId, minutes);
-    }
+      const detailsButton = event.target.closest("[data-open-mention-details]");
+
+      if (detailsButton) {
+        openMentionDetails(detailsButton.dataset.openMentionDetails);
+
+        return;
+      }
+
+      const reactivateButton = event.target.closest(
+        "[data-reactivate-mention]",
+      );
+    });
   });
 }
 
