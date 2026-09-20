@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>TaskFlow — Login</title>
+    <link rel="icon" type="image/png" href="assets/images/logo.png" />
+    <title>Tasks Manager — Login</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -68,7 +68,7 @@
         width: 58px;
         height: 58px;
         border-radius: 16px;
-        background: var(--primary);
+        /* background: var(--primary); */
         color: #fff;
         display: flex;
         align-items: center;
@@ -76,6 +76,22 @@
         margin: 0 auto 16px;
         font-size: 22px;
         box-shadow: 0 15px 35px rgba(0, 0, 0, 0.14);
+      }
+
+      .brand-mark {
+        width: 50px;
+        height: 50px;
+
+        display: grid;
+        place-items: center;
+
+        border-radius: 10px;
+
+        color: white;
+
+        /* background: linear-gradient(135deg, var(--accent), var(--accent-2)); */
+
+        /* box-shadow: 0 8px 30px rgba(139, 92, 246, 0.25); */
       }
 
       .brand h1 {
@@ -282,10 +298,10 @@
     <main class="login-shell">
       <div class="brand">
         <div class="brand-icon">
-          <i class="fa-solid fa-layer-group"></i>
+          <img src="assets/images/logo.png" alt="Logo" class="brand-mark" />
         </div>
 
-        <h1>TaskFlow</h1>
+        <h1>Tasks Manager</h1>
         <p>Internal Team Task Management</p>
       </div>
 
@@ -344,7 +360,7 @@
         </form>
       </section>
 
-      <div class="footer">TaskFlow Internal System</div>
+      <div class="footer">Tasks Manager Internal System</div>
     </main>
 
     <script type="module">
@@ -403,7 +419,7 @@
 
           if (!profile) {
             showError(
-              "Your account exists, but no TaskFlow profile was found. Please contact an administrator.",
+              "Your account exists, but no Tasks Manager profile was found. Please contact an administrator.",
             );
             redirecting = false;
             return;

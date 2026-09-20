@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>TaskFlow — Admin</title>
+    <link rel="icon" type="image/png" href="assets/images/logo.png" />
+    <title>Tasks Manager — Admin</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
 
@@ -32,12 +32,19 @@
 
       <aside class="sidebar">
         <div class="brand">
+          <button
+            class="mobile-sidebar-close"
+            id="mobileSidebarClose"
+            aria-label="Close menu"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
           <div class="brand-icon">
-            <i class="fa-solid fa-layer-group"></i>
+            <img src="assets/images/logo.png" alt="Logo" class="brand-mark" />
           </div>
 
           <div>
-            <h2>TaskFlow</h2>
+            <h2>Tasks Manager</h2>
             <span>Admin Panel</span>
           </div>
         </div>
@@ -57,6 +64,11 @@
             <i class="fa-solid fa-users"></i>
             <span>Users</span>
           </button>
+
+          <button class="nav-item" data-section="mentions">
+            <i class="fa-solid fa-at"></i>
+            <span>Mentions</span>
+          </button>
         </nav>
 
         <div class="sidebar-bottom">
@@ -74,9 +86,14 @@
       <main class="main">
         <header class="topbar">
           <div class="mobile-brand">
-            <i class="fa-solid fa-layer-group"></i>
-
-            <span> TaskFlow </span>
+            <button
+              class="mobile-menu-button"
+              id="mobileMenuButton"
+              aria-label="Open menu"
+            >
+              <i class="fa-solid fa-bars"></i>
+            </button>
+            <span> Tasks Manager </span>
           </div>
 
           <div class="topbar-actions">
@@ -271,6 +288,172 @@
           </section>
 
           <!-- =================================================
+     MENTIONS
+================================================== -->
+          <section class="page-section" id="mentionsSection">
+            <div class="page-header">
+              <div>
+                <p class="eyebrow">Management</p>
+
+                <h1>Mentions</h1>
+
+                <p class="page-description">
+                  Manage Facebook mentions, execution cycles and analytics.
+                </p>
+              </div>
+
+              <button class="primary-button" id="addMentionButton">
+                <i class="fa-solid fa-plus"></i>
+                Create Mention
+              </button>
+            </div>
+
+            <!-- Mention Analytics -->
+            <div class="mention-stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon total">
+                  <i class="fa-solid fa-at"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Total Mentions</span>
+                  <strong id="mentionTotal">0</strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon pending">
+                  <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Active</span>
+                  <strong id="mentionActive">0</strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon completed">
+                  <i class="fa-solid fa-unlock"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Open</span>
+                  <strong id="mentionOpen">0</strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon pending">
+                  <i class="fa-solid fa-lock"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Locked</span>
+                  <strong id="mentionLocked">0</strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon expired">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Expired</span>
+                  <strong id="mentionExpired">0</strong>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon completed">
+                  <i class="fa-solid fa-check-double"></i>
+                </div>
+                <div class="stat-content">
+                  <span>Completed</span>
+                  <strong id="mentionCompleted">0</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="section-card mention-settings-card">
+              <div class="section-card-header">
+                <div>
+                  <h2>Mention Settings</h2>
+                  <p>This duration applies only to newly created Mentions.</p>
+                </div>
+              </div>
+
+              <form id="mentionSettingsForm" class="mention-settings-form">
+                <div class="form-group">
+                  <label for="mentionLockDuration">
+                    Default Lock Duration
+                  </label>
+
+                  <select id="mentionLockDuration" class="select-input">
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                    <option value="360">6 hours</option>
+                    <option value="480">8 hours</option>
+                    <option value="720">12 hours</option>
+                    <option value="1440">24 hours</option>
+                  </select>
+                </div>
+
+                <button type="submit" class="primary-button">
+                  <i class="fa-solid fa-floppy-disk"></i>
+                  Save Settings
+                </button>
+              </form>
+            </div>
+
+            <!-- Performance -->
+            <div class="section-card">
+              <div class="section-card-header">
+                <div>
+                  <h2>User Performance</h2>
+                  <p>Creation, completion and pending participation.</p>
+                </div>
+              </div>
+
+              <div class="users-table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Created</th>
+                      <th>Completed</th>
+                      <th>Pending</th>
+                    </tr>
+                  </thead>
+
+                  <tbody id="mentionPerformanceBody">
+                    <tr>
+                      <td colspan="4" class="table-loading">
+                        Loading analytics...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Mentions list -->
+            <div class="section-card">
+              <div class="section-card-header">
+                <div>
+                  <h2>All Mentions</h2>
+                  <p>Every authenticated active user can see Mentions.</p>
+                </div>
+              </div>
+
+              <div id="adminMentionsList" class="mentions-grid">
+                <div class="loading-state">
+                  <div class="spinner"></div>
+                  <span>Loading mentions...</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- =================================================
                  USERS
             ================================================== -->
 
@@ -326,6 +509,84 @@
           </section>
         </div>
       </main>
+    </div>
+
+    <!-- =========================================================
+     CREATE MENTION MODAL
+========================================================== -->
+    <div class="modal-overlay" id="mentionModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <span class="modal-label">Mention Management</span>
+            <h2>Create Mention</h2>
+          </div>
+
+          <button class="modal-close" data-close-modal="mentionModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <form id="mentionForm" class="modal-body">
+          <div class="form-group">
+            <label for="mentionUrl"> Facebook Post URL </label>
+
+            <input
+              id="mentionUrl"
+              type="url"
+              placeholder="https://facebook.com/..."
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="mentionDescription"> Notes </label>
+
+            <textarea
+              id="mentionDescription"
+              rows="4"
+              placeholder="Optional notes..."
+            ></textarea>
+          </div>
+
+          <div class="modal-form-footer">
+            <button
+              type="button"
+              class="secondary-button"
+              data-close-modal="mentionModal"
+            >
+              Cancel
+            </button>
+
+            <button type="submit" class="primary-button">
+              <i class="fa-solid fa-plus"></i>
+              Create Mention
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- =========================================================
+     MENTION DETAILS MODAL
+========================================================== -->
+    <div class="modal-overlay" id="mentionDetailsModal">
+      <div class="modal modal-large">
+        <div class="modal-header">
+          <div>
+            <span class="modal-label">Mention Details</span>
+            <h2 id="mentionDetailsTitle">Mention</h2>
+          </div>
+
+          <button class="modal-close" data-close-modal="mentionDetailsModal">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div id="mentionDetailsContent"></div>
+        </div>
+      </div>
     </div>
 
     <!-- =========================================================
@@ -604,6 +865,7 @@
       </button>
     </div>
 
+    <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
     <script type="module" src="admin.js"></script>
   </body>
 </html>

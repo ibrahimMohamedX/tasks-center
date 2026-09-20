@@ -2,3 +2,5 @@ node_modules/
 firebase-debug.log
 .firebase/
 .env
+functions/node_modules/
+fcm-test/serviceAccountKey.json

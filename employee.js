@@ -13,6 +13,13 @@ import {
   calculateTaskStatus,
   convertFirebaseDate,
   getReadableFirebaseError,
+  createMention,
+  watchMentions,
+  getMentionStatus,
+  claimMention,
+  completeMention,
+  registerPushNotifications,
+  listenForForegroundNotifications,
 } from "./firebase.js";
 
 // ============================================================
@@ -24,10 +31,14 @@ const state = {
   profile: null,
 
   tasks: [],
+  mentions: [],
 
   currentFilter: "all",
 
   selectedTask: null,
+
+  mentionUnsubscribe: null,
+  mentionCountdownInterval: null,
 
   loading: false,
 };
@@ -102,6 +113,22 @@ const elements = {
   toastMessage: document.getElementById("toastMessage"),
 
   closeToast: document.getElementById("closeToast"),
+
+  employeeAddMentionButton: document.getElementById("employeeAddMentionButton"),
+
+  employeeMentionForm: document.getElementById("employeeMentionForm"),
+
+  employeeMentionsList: document.getElementById("employeeMentionsList"),
+
+  employeeMentionModal: document.getElementById("employeeMentionModal"),
+
+  employeeMentionDetailsModal: document.getElementById(
+    "employeeMentionDetailsModal",
+  ),
+
+  employeeMentionDetailsContent: document.getElementById(
+    "employeeMentionDetailsContent",
+  ),
 };
 
 // ============================================================
@@ -112,9 +139,12 @@ document.addEventListener("DOMContentLoaded", initialize);
 
 function initialize() {
   setupNavigation();
+  setupMobileSidebar();
   setupFilters();
   setupActions();
   setupModal();
+
+  startEmployeeMentionCountdown();
 
   listenToAuthentication();
 
@@ -173,11 +203,14 @@ async function initializeEmployee(userId) {
       return;
     }
 
+    await setupPushNotifications();
+
     state.profile = profile;
 
     renderUserProfile();
 
     await loadTasks();
+    await initializeEmployeeMentions();
   } catch (error) {
     console.error("Employee initialization error:", error);
 
@@ -186,7 +219,6 @@ async function initializeEmployee(userId) {
     setLoading(false);
   }
 }
-
 // ============================================================
 // PROFILE
 // ============================================================
@@ -570,6 +602,7 @@ async function handleCompleteTask() {
     showToast("Task completed", "The task has been marked as completed.");
 
     await loadTasks();
+    await initializeEmployeeMentions();
   } catch (error) {
     console.error("Complete task error:", error);
 
@@ -608,6 +641,580 @@ function setupFilters() {
       renderTasks();
     });
   });
+}
+
+// ============================================================
+// EMPLOYEE MENTIONS
+// ============================================================
+
+async function initializeEmployeeMentions() {
+  try {
+    if (state.mentionUnsubscribe) {
+      state.mentionUnsubscribe();
+    }
+
+    state.mentionUnsubscribe = watchMentions((mentions) => {
+      state.mentions = mentions;
+
+      renderEmployeeMentions();
+      refreshEmployeeMentionDetails();
+    });
+  } catch (error) {
+    console.error("Employee Mentions initialization error:", error);
+
+    showToast("Mentions Error", getReadableFirebaseError(error), "error");
+  }
+}
+
+function renderEmployeeMentions() {
+  if (!elements.employeeMentionsList) {
+    return;
+  }
+
+  if (!state.mentions.length) {
+    elements.employeeMentionsList.innerHTML = createEmptyState(
+      "No Mentions yet",
+      "There are no Mentions available.",
+    );
+
+    return;
+  }
+
+  elements.employeeMentionsList.innerHTML = state.mentions
+    .map((mention) => createEmployeeMentionCard(mention))
+    .join("");
+}
+
+function createEmployeeMentionCard(mention) {
+  const status = getMentionStatus(mention);
+
+  const currentUid = state.authUser?.uid;
+
+  const isCreator = mention.createdBy === currentUid;
+
+  const completedBy = Array.isArray(mention.completedBy)
+    ? mention.completedBy
+    : [];
+
+  const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+  const completedByMe = completedBy.some((item) => item.uid === currentUid);
+
+  const pendingForMe = queue.some((item) => item.uid === currentUid);
+
+  const claimedByMe = mention.currentLocker?.uid === currentUid;
+
+  let action = "";
+
+  if (completedByMe) {
+    action = `
+      <span class="mention-personal-state completed">
+        <i class="fa-solid fa-circle-check"></i>
+        Completed by you
+      </span>
+    `;
+  } else if (isCreator) {
+    action = `
+      <span class="mention-personal-state creator">
+        <i class="fa-solid fa-user-check"></i>
+        You created this Mention
+      </span>
+    `;
+  } else if (claimedByMe) {
+    action = `
+      <button
+        type="button"
+        class="primary-button"
+        data-complete-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-check"></i>
+        Complete Mention
+      </button>
+    `;
+  } else if (pendingForMe && status === "open") {
+    action = `
+      <button
+        type="button"
+        class="primary-button"
+        data-claim-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-play"></i>
+        Execute Mention
+      </button>
+    `;
+  } else if (pendingForMe && status === "locked") {
+    action = `
+      <span class="mention-personal-state waiting">
+        <i class="fa-solid fa-lock"></i>
+        Waiting for availability
+      </span>
+    `;
+  } else if (!pendingForMe && !completedByMe && !isCreator) {
+    action = `
+      <span class="mention-personal-state">
+        Not required
+      </span>
+    `;
+  }
+
+  const locker = mention.currentLocker?.name || "";
+
+  return `
+    <article
+      class="mention-card"
+      data-employee-mention-details="${escapeHtml(mention.id)}"
+    >
+      <div class="mention-card-header">
+        <div>
+          <span class="mention-type">
+            <i class="fa-solid fa-at"></i>
+            Facebook Mention
+          </span>
+
+          <h3>
+            ${escapeHtml(mention.url || "Unknown URL")}
+          </h3>
+        </div>
+
+        ${createEmployeeMentionBadge(status)}
+      </div>
+
+      ${
+        mention.description
+          ? `
+            <p class="mention-description">
+              ${escapeHtml(mention.description)}
+            </p>
+          `
+          : ""
+      }
+
+      <div class="mention-meta-grid">
+        <div>
+          <span>Created by</span>
+          <strong>
+            ${escapeHtml(mention.createdByName || "Unknown")}
+          </strong>
+        </div>
+
+        <div>
+          <span>Expires</span>
+          <strong>
+            ${formatDateTime(mention.expiresAt)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Progress</span>
+          <strong>
+            ${mention.totalCompleted || completedBy.length}
+            /
+            ${mention.totalParticipants || 0}
+          </strong>
+        </div>
+
+        <div>
+          <span>Cycles</span>
+          <strong>
+            ${mention.cycles || 0}
+          </strong>
+        </div>
+      </div>
+
+      <div class="mention-status-line">
+        ${
+          status === "locked"
+            ? `
+              <span
+                class="mention-countdown"
+                data-employee-countdown="${escapeHtml(mention.id)}"
+                data-status="${escapeHtml(status)}"
+                >
+                ${getEmployeeMentionCountdown(mention)}
+              </span>
+            `
+            : status === "open"
+              ? `
+                <span class="mention-open-text">
+                  <i class="fa-solid fa-circle"></i>
+                  Available now
+                </span>
+              `
+              : status === "expired"
+                ? `
+                  <span>
+                    <i class="fa-solid fa-clock"></i>
+                    Expired
+                  </span>
+                `
+                : `
+                  <span>
+                    <i class="fa-solid fa-check-double"></i>
+                    Completed
+                  </span>
+                `
+        }
+
+        ${
+          locker
+            ? `
+              <span>
+                <i class="fa-solid fa-user-lock"></i>
+                ${escapeHtml(locker)}
+              </span>
+            `
+            : ""
+        }
+      </div>
+
+      <div class="mention-card-footer">
+        <span>
+          ${queue.length} pending
+          ·
+          ${completedBy.length} completed
+        </span>
+
+        <div class="mention-actions">
+          ${action}
+
+          <button
+            type="button"
+            class="secondary-button small"
+            data-employee-details="${escapeHtml(mention.id)}"
+          >
+            Details
+          </button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function createEmployeeMentionBadge(status) {
+  const labels = {
+    locked: "LOCKED",
+    open: "OPEN",
+    expired: "EXPIRED",
+    completed: "COMPLETED",
+  };
+
+  return `
+    <span class="mention-status-badge ${status}">
+      ${labels[status] || "UNKNOWN"}
+    </span>
+  `;
+}
+
+function getEmployeeMentionCountdown(mention) {
+  const status = getMentionStatus(mention);
+
+  if (status === "open") {
+    return "Available now";
+  }
+
+  if (status === "expired") {
+    return "Expired";
+  }
+
+  if (status === "completed") {
+    return "Completed";
+  }
+
+  const target =
+    mention.currentLocker && mention.lockUntil
+      ? convertFirebaseDate(mention.lockUntil)
+      : convertFirebaseDate(mention.unlockAt);
+
+  if (!target) {
+    return "Waiting...";
+  }
+
+  const diff = target.getTime() - Date.now();
+
+  if (diff <= 0) {
+    return "Updating...";
+  }
+
+  return `${
+    mention.currentLocker ? "Currently locked · " : "Opens in "
+  }${formatMentionDuration(diff)}`;
+}
+
+function formatMentionDuration(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+
+  const hours = Math.floor(totalSeconds / 3600);
+
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function startEmployeeMentionCountdown() {
+  if (state.mentionCountdownInterval) {
+    clearInterval(state.mentionCountdownInterval);
+  }
+
+  state.mentionCountdownInterval = setInterval(() => {
+    document
+      .querySelectorAll("[data-employee-countdown]")
+      .forEach((element) => {
+        const mention = state.mentions.find(
+          (item) => item.id === element.dataset.employeeCountdown,
+        );
+
+        if (!mention) {
+          return;
+        }
+
+        const nextStatus = getMentionStatus(mention);
+
+        const previousStatus = element.dataset.status;
+
+        if (previousStatus !== nextStatus) {
+          element.dataset.status = nextStatus;
+
+          renderEmployeeMentions();
+
+          return;
+        }
+
+        element.textContent = getEmployeeMentionCountdown(mention);
+      });
+  }, 1000);
+}
+
+async function handleEmployeeCreateMention(event) {
+  event.preventDefault();
+
+  const submitButton = elements.employeeMentionForm?.querySelector(
+    'button[type="submit"]',
+  );
+
+  const url = document.getElementById("employeeMentionUrl")?.value || "";
+
+  const description =
+    document.getElementById("employeeMentionDescription")?.value || "";
+
+  try {
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    await createMention({
+      url,
+      description,
+    });
+
+    elements.employeeMentionForm.reset();
+
+    closeEmployeeMentionModal();
+
+    showToast("Mention created", "The Mention was created successfully.");
+  } catch (error) {
+    console.error("Employee create Mention error:", error);
+
+    showToast(
+      "Unable to create Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+  }
+}
+
+async function handleClaimMention(mentionId) {
+  try {
+    await claimMention(mentionId);
+
+    showToast("Mention claimed", "You can now execute this Mention.");
+  } catch (error) {
+    console.error("Claim Mention error:", error);
+
+    showToast("Mention unavailable", getReadableFirebaseError(error), "error");
+  }
+}
+
+async function handleCompleteMention(mentionId) {
+  try {
+    await completeMention(mentionId);
+
+    showToast("Mention completed", "Your participation has been recorded.");
+  } catch (error) {
+    console.error("Complete Mention error:", error);
+
+    showToast(
+      "Unable to complete Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  }
+}
+
+function openEmployeeMentionDetails(mentionId) {
+  const mention = state.mentions.find((item) => item.id === mentionId);
+
+  if (!mention) {
+    return;
+  }
+
+  const status = getMentionStatus(mention);
+
+  const currentUid = state.authUser?.uid;
+
+  const completed = Array.isArray(mention.completedBy)
+    ? mention.completedBy
+    : [];
+
+  const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+  const isCreator = mention.createdBy === currentUid;
+
+  const completedByMe = completed.some((item) => item.uid === currentUid);
+
+  const claimedByMe = mention.currentLocker?.uid === currentUid;
+
+  const pendingForMe = queue.some((item) => item.uid === currentUid);
+
+  let personalState = "";
+
+  if (isCreator) {
+    personalState =
+      "You created this Mention. You are not required to execute it.";
+  } else if (completedByMe) {
+    personalState = "You have already completed this Mention.";
+  } else if (claimedByMe) {
+    personalState = "You currently have the execution lock.";
+  } else if (pendingForMe) {
+    personalState = "You are still pending for this Mention.";
+  } else {
+    personalState = "You are not required to execute this Mention.";
+  }
+
+  elements.employeeMentionDetailsModal.dataset.mentionId = mentionId;
+
+  elements.employeeMentionDetailsContent.innerHTML = `
+    <div class="mention-details">
+      <div class="mention-detail-url">
+        <span>Facebook URL</span>
+
+        <a
+          href="${escapeAttribute(mention.url || "#")}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ${escapeHtml(mention.url || "—")}
+        </a>
+      </div>
+
+      <div class="mention-details-grid">
+        <div>
+          <span>Status</span>
+          ${createEmployeeMentionBadge(status)}
+        </div>
+
+        <div>
+          <span>Created by</span>
+          <strong>
+            ${escapeHtml(mention.createdByName || "Unknown")}
+          </strong>
+        </div>
+
+        <div>
+          <span>Created at</span>
+          <strong>
+            ${formatDateTime(mention.createdAt)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Expires at</span>
+          <strong>
+            ${formatDateTime(mention.expiresAt)}
+          </strong>
+        </div>
+      </div>
+
+      <div class="mention-detail-section">
+        <h3>Your status</h3>
+
+        <div class="participant-item ${completedByMe ? "completed" : ""}">
+          ${escapeHtml(personalState)}
+        </div>
+      </div>
+
+      <div class="mention-detail-section">
+        <h3>Participants</h3>
+
+        <div class="participant-list">
+          ${completed
+            .map(
+              (item) => `
+                <div class="participant-item completed">
+                  <span>
+                    <i class="fa-solid fa-check"></i>
+                    ${escapeHtml(item.name || "Unknown")}
+                  </span>
+
+                  <strong>
+                    Completed
+                  </strong>
+                </div>
+              `,
+            )
+            .join("")}
+
+          ${queue
+            .map(
+              (item) => `
+                <div class="participant-item pending">
+                  <span>
+                    <i class="fa-regular fa-clock"></i>
+                    ${escapeHtml(item.name || "Unknown")}
+                  </span>
+
+                  <strong>
+                    Waiting
+                  </strong>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+      </div>
+    </div>
+  `;
+
+  elements.employeeMentionDetailsModal?.classList.add("active");
+
+  document.body.style.overflow = "hidden";
+}
+
+function refreshEmployeeMentionDetails() {
+  const modal = elements.employeeMentionDetailsModal;
+
+  if (!modal || !modal.classList.contains("active")) {
+    return;
+  }
+
+  const mentionId = modal.dataset.mentionId;
+
+  if (mentionId) {
+    openEmployeeMentionDetails(mentionId);
+  }
 }
 
 // ============================================================
@@ -678,6 +1285,64 @@ function setupActions() {
   });
 
   elements.completeTaskButton?.addEventListener("click", handleCompleteTask);
+
+  elements.employeeAddMentionButton?.addEventListener(
+    "click",
+    openEmployeeMentionModal,
+  );
+
+  elements.employeeMentionForm?.addEventListener(
+    "submit",
+    handleEmployeeCreateMention,
+  );
+
+  document.addEventListener("click", (event) => {
+    const claimButton = event.target.closest("[data-claim-mention]");
+
+    if (claimButton) {
+      handleClaimMention(claimButton.dataset.claimMention);
+
+      return;
+    }
+
+    const completeButton = event.target.closest("[data-complete-mention]");
+
+    if (completeButton) {
+      handleCompleteMention(completeButton.dataset.completeMention);
+
+      return;
+    }
+
+    const detailsButton = event.target.closest("[data-employee-details]");
+
+    if (detailsButton) {
+      openEmployeeMentionDetails(detailsButton.dataset.employeeDetails);
+    }
+  });
+
+  document
+    .querySelectorAll("[data-close-employee-mention]")
+    .forEach((button) => {
+      button.addEventListener("click", closeEmployeeMentionModal);
+    });
+
+  document
+    .querySelectorAll("[data-close-employee-details]")
+    .forEach((button) => {
+      button.addEventListener("click", closeEmployeeMentionDetails);
+    });
+
+  elements.employeeMentionModal?.addEventListener("click", (event) => {
+    if (event.target === elements.employeeMentionModal) {
+      closeEmployeeMentionModal();
+    }
+  });
+
+  elements.employeeMentionDetailsModal?.addEventListener("click", (event) => {
+    if (event.target === elements.employeeMentionDetailsModal) {
+      closeEmployeeMentionDetails();
+    }
+  });
 }
 
 // ============================================================
@@ -716,6 +1381,28 @@ function closeModal() {
   document.body.style.overflow = "";
 
   state.selectedTask = null;
+}
+
+function openEmployeeMentionModal() {
+  elements.employeeMentionModal?.classList.add("active");
+
+  document.body.style.overflow = "hidden";
+}
+
+function closeEmployeeMentionModal() {
+  elements.employeeMentionModal?.classList.remove("active");
+
+  if (!elements.employeeMentionDetailsModal?.classList.contains("active")) {
+    document.body.style.overflow = "";
+  }
+}
+
+function closeEmployeeMentionDetails() {
+  elements.employeeMentionDetailsModal?.classList.remove("active");
+
+  if (!elements.employeeMentionModal?.classList.contains("active")) {
+    document.body.style.overflow = "";
+  }
 }
 
 // ============================================================
@@ -961,4 +1648,84 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+function setupMobileSidebar() {
+  const menuButton = document.getElementById("mobileMenuButton");
+  const closeButton = document.getElementById("mobileSidebarClose");
+  const overlay = document.getElementById("mobileSidebarOverlay");
+
+  if (!menuButton || !closeButton || !overlay) {
+    return;
+  }
+
+  const openSidebar = () => {
+    document.body.classList.add("sidebar-open");
+  };
+
+  const closeSidebar = () => {
+    document.body.classList.remove("sidebar-open");
+  };
+
+  menuButton.addEventListener("click", openSidebar);
+  closeButton.addEventListener("click", closeSidebar);
+  overlay.addEventListener("click", closeSidebar);
+
+  // Close sidebar after selecting a navigation item on mobile.
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.addEventListener("click", closeSidebar);
+  });
+
+  // Close with Escape.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeSidebar();
+    }
+  });
+}
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+async function setupPushNotifications() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("./firebase-messaging-sw.js");
+
+    await registerPushNotifications();
+
+    await listenForForegroundNotifications((payload) => {
+      console.log("Foreground notification:", payload);
+
+      showNotificationToast(payload);
+    });
+  } catch (error) {
+    console.error("Push notification setup failed:", error);
+  }
+}
+
+function showNotificationToast(payload) {
+  const notification = payload.notification || {};
+
+  const title = notification.title || "New Notification";
+
+  const message = notification.body || "";
+
+  if (typeof showToast === "function") {
+    showToast(title, message);
+
+    return;
+  }
+
+  console.log(`${title}: ${message}`);
 }

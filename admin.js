@@ -14,6 +14,18 @@ import {
   calculateTaskStatus,
   convertFirebaseDate,
   getReadableFirebaseError,
+  createMention,
+  getMentions,
+  watchMentions,
+  getMentionStatus,
+  claimMention,
+  completeMention,
+  reactivateMention,
+  getMentionSettings,
+  updateMentionSettings,
+  getMentionAnalytics,
+  registerPushNotifications,
+  listenForForegroundNotifications,
 } from "./firebase.js";
 
 // ============================================================
@@ -26,9 +38,13 @@ const state = {
 
   users: [],
   tasks: [],
+  mentions: [],
 
   taskFilter: "all",
   taskUserFilter: "all",
+
+  mentionUnsubscribe: null,
+  mentionCountdownInterval: null,
 
   loading: false,
 };
@@ -93,6 +109,33 @@ const el = {
   toastMessage: document.getElementById("toastMessage"),
 
   closeToast: document.getElementById("closeToast"),
+
+  addMentionButton: document.getElementById("addMentionButton"),
+
+  mentionForm: document.getElementById("mentionForm"),
+
+  mentionSettingsForm: document.getElementById("mentionSettingsForm"),
+
+  mentionLockDuration: document.getElementById("mentionLockDuration"),
+
+  adminMentionsList: document.getElementById("adminMentionsList"),
+
+  mentionPerformanceBody: document.getElementById("mentionPerformanceBody"),
+
+  mentionModal: document.getElementById("mentionModal"),
+
+  mentionDetailsModal: document.getElementById("mentionDetailsModal"),
+
+  mentionDetailsContent: document.getElementById("mentionDetailsContent"),
+
+  mentionDetailsTitle: document.getElementById("mentionDetailsTitle"),
+
+  mentionTotal: document.getElementById("mentionTotal"),
+  mentionActive: document.getElementById("mentionActive"),
+  mentionOpen: document.getElementById("mentionOpen"),
+  mentionLocked: document.getElementById("mentionLocked"),
+  mentionExpired: document.getElementById("mentionExpired"),
+  mentionCompleted: document.getElementById("mentionCompleted"),
 };
 
 // ============================================================
@@ -103,9 +146,12 @@ document.addEventListener("DOMContentLoaded", initialize);
 
 function initialize() {
   setupNavigation();
+  setupMobileSidebar();
   setupFilters();
   setupModals();
   setupActions();
+
+  startMentionCountdown();
 
   listenToAuthentication();
 }
@@ -169,7 +215,11 @@ async function initializeAdmin(userId) {
 
     renderProfile();
 
+    await setupPushNotifications();
+
     await loadData();
+
+    await initializeMentions();
   } catch (error) {
     console.error("Admin initialization error:", error);
 
@@ -861,6 +911,819 @@ async function handleEditUser(event) {
 }
 
 // ============================================================
+// MENTIONS
+// ============================================================
+
+async function initializeMentions() {
+  try {
+    await loadMentionSettings();
+
+    await loadMentionAnalytics();
+
+    if (state.mentionUnsubscribe) {
+      state.mentionUnsubscribe();
+    }
+
+    state.mentionUnsubscribe = watchMentions((mentions) => {
+      state.mentions = mentions;
+
+      renderAdminMentions();
+      renderMentionAnalytics();
+      refreshMentionDetailsIfOpen();
+    });
+  } catch (error) {
+    console.error("Mentions initialization error:", error);
+
+    showToast("Mentions Error", getReadableFirebaseError(error), "error");
+  }
+}
+
+async function loadMentionSettings() {
+  const settings = await getMentionSettings();
+
+  if (el.mentionLockDuration) {
+    el.mentionLockDuration.value = String(settings.defaultLockDurationMinutes);
+  }
+}
+
+async function loadMentionAnalytics() {
+  const analytics = await getMentionAnalytics();
+
+  renderMentionAnalyticsData(analytics);
+}
+
+function renderMentionAnalytics() {
+  loadMentionAnalytics().catch((error) => {
+    console.error("Mention analytics error:", error);
+  });
+}
+
+function renderMentionAnalyticsData(analytics) {
+  const stats = analytics?.stats || {};
+
+  if (el.mentionTotal) {
+    el.mentionTotal.textContent = stats.totalMentions || 0;
+  }
+
+  if (el.mentionActive) {
+    el.mentionActive.textContent = stats.activeMentions || 0;
+  }
+
+  if (el.mentionOpen) {
+    el.mentionOpen.textContent = stats.openMentions || 0;
+  }
+
+  if (el.mentionLocked) {
+    el.mentionLocked.textContent = stats.lockedMentions || 0;
+  }
+
+  if (el.mentionExpired) {
+    el.mentionExpired.textContent = stats.expiredMentions || 0;
+  }
+
+  if (el.mentionCompleted) {
+    el.mentionCompleted.textContent = stats.completedMentions || 0;
+  }
+
+  if (!el.mentionPerformanceBody) {
+    return;
+  }
+
+  const users = analytics?.users || [];
+
+  if (!users.length) {
+    el.mentionPerformanceBody.innerHTML = `
+      <tr>
+        <td colspan="4" class="table-loading">
+          No analytics data yet.
+        </td>
+      </tr>
+    `;
+
+    return;
+  }
+
+  el.mentionPerformanceBody.innerHTML = users
+    .map(
+      (user) => `
+          <tr>
+            <td>
+              <strong>
+                ${escapeHtml(user.name || "Unnamed")}
+              </strong>
+            </td>
+
+            <td>
+              ${user.createdCount || 0}
+            </td>
+
+            <td>
+              ${user.completedCount || 0}
+            </td>
+
+            <td>
+              ${user.pendingCount || 0}
+            </td>
+          </tr>
+        `,
+    )
+    .join("");
+}
+
+function renderAdminMentions() {
+  if (!el.adminMentionsList) {
+    return;
+  }
+
+  if (!state.mentions.length) {
+    el.adminMentionsList.innerHTML = createEmptyState(
+      "No Mentions yet",
+      "Create the first Facebook Mention.",
+    );
+
+    return;
+  }
+
+  el.adminMentionsList.innerHTML = state.mentions
+    .map((mention) => createAdminMentionCard(mention))
+    .join("");
+}
+
+function createAdminMentionCard(mention) {
+  const status = getMentionStatus(mention);
+
+  const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+  const completed = Array.isArray(mention.completedBy)
+    ? mention.completedBy
+    : [];
+
+  const locker = mention.currentLocker?.name || "";
+
+  const isExpired = status === "expired";
+
+  return `
+    <article
+      class="mention-card"
+      data-mention-details="${escapeHtml(mention.id)}"
+    >
+      <div class="mention-card-header">
+        <div>
+          <span class="mention-type">
+            <i class="fa-solid fa-at"></i>
+            Facebook Mention
+          </span>
+
+          <h3>
+            ${escapeHtml(mention.url || "Unknown URL")}
+          </h3>
+        </div>
+
+        ${createMentionStatusBadge(status)}
+      </div>
+
+      ${
+        mention.description
+          ? `
+            <p class="mention-description">
+              ${escapeHtml(mention.description)}
+            </p>
+          `
+          : ""
+      }
+
+      <div class="mention-meta-grid">
+        <div>
+          <span>Created by</span>
+          <strong>
+            ${escapeHtml(mention.createdByName || "Unknown")}
+          </strong>
+        </div>
+
+        <div>
+          <span>Created</span>
+          <strong>
+            ${formatDateTime(mention.createdAt)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Participants</span>
+          <strong>
+            ${mention.totalCompleted || 0}
+            /
+            ${mention.totalParticipants || 0}
+          </strong>
+        </div>
+
+        <div>
+          <span>Lock duration</span>
+          <strong>
+            ${formatDuration(mention.lockDurationMinutes * 60 * 1000)}
+          </strong>
+        </div>
+      </div>
+
+      <div class="mention-status-line">
+        ${
+          status === "locked"
+            ? createMentionTimerHtml(mention)
+            : status === "open"
+              ? `
+                <span class="mention-open-text">
+                  <i class="fa-solid fa-circle"></i>
+                  Available now
+                </span>
+              `
+              : status === "expired"
+                ? `
+                  <span>
+                    <i class="fa-solid fa-clock"></i>
+                    Expired
+                  </span>
+                `
+                : `
+                  <span>
+                    <i class="fa-solid fa-check-double"></i>
+                    All participants completed
+                  </span>
+                `
+        }
+
+        ${
+          locker
+            ? `
+              <span>
+                <i class="fa-solid fa-user-lock"></i>
+                ${escapeHtml(locker)}
+              </span>
+            `
+            : ""
+        }
+      </div>
+
+      <div class="mention-card-footer">
+        <span>
+          ${queue.length} pending
+          ·
+          ${completed.length} completed
+        </span>
+
+        <div class="mention-actions">
+          <button
+            type="button"
+            class="secondary-button small"
+            data-open-mention-details="${escapeHtml(mention.id)}"
+          >
+            Details
+          </button>
+
+          ${
+            isExpired
+              ? `
+                <button
+                  type="button"
+                  class="primary-button small"
+                  data-reactivate-mention="${escapeHtml(mention.id)}"
+                >
+                  <i class="fa-solid fa-rotate"></i>
+                  Reactivate
+                </button>
+              `
+              : ""
+          }
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function createMentionStatusBadge(status) {
+  const labels = {
+    locked: "LOCKED",
+    open: "OPEN",
+    expired: "EXPIRED",
+    completed: "COMPLETED",
+  };
+
+  return `
+    <span class="mention-status-badge ${status}">
+      ${labels[status] || "UNKNOWN"}
+    </span>
+  `;
+}
+
+function createMentionTimerHtml(mention) {
+  const target =
+    mention.currentLocker && mention.lockUntil
+      ? mention.lockUntil
+      : mention.unlockAt;
+
+  return `
+    <span
+      class="mention-countdown"
+      data-countdown-type="mention"
+      data-target="${escapeHtml(String(timestampForClient(target)))}"
+      data-mention-id="${escapeHtml(mention.id)}"
+    >
+      ${getMentionCountdownText(mention)}
+    </span>
+  `;
+}
+
+function timestampForClient(value) {
+  const date = convertFirebaseDate(value);
+
+  return date ? date.getTime() : 0;
+}
+
+function getMentionCountdownText(mention) {
+  const status = getMentionStatus(mention);
+
+  const now = Date.now();
+
+  if (status === "open") {
+    return "Available now";
+  }
+
+  if (status === "expired") {
+    return "Expired";
+  }
+
+  if (status === "completed") {
+    return "Completed";
+  }
+
+  const target =
+    mention.currentLocker && mention.lockUntil
+      ? convertFirebaseDate(mention.lockUntil)
+      : convertFirebaseDate(mention.unlockAt);
+
+  if (!target) {
+    return "Waiting...";
+  }
+
+  const diff = target.getTime() - now;
+
+  if (diff <= 0) {
+    return "Updating...";
+  }
+
+  return `${
+    mention.currentLocker ? "Locked for " : "Opens in "
+  }${formatDuration(diff)}`;
+}
+
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+
+  const days = Math.floor(totalSeconds / 86400);
+
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function startMentionCountdown() {
+  if (state.mentionCountdownInterval) {
+    clearInterval(state.mentionCountdownInterval);
+  }
+
+  state.mentionCountdownInterval = setInterval(() => {
+    document
+      .querySelectorAll("[data-countdown-type='mention']")
+      .forEach((element) => {
+        const mention = state.mentions.find(
+          (item) => item.id === element.dataset.mentionId,
+        );
+
+        if (!mention) {
+          return;
+        }
+
+        element.textContent = getMentionCountdownText(mention);
+      });
+
+    renderAdminMentionsIfNeeded();
+  }, 1000);
+}
+
+let lastMentionRenderSignature = "";
+
+function renderAdminMentionsIfNeeded() {
+  if (!state.mentions.length) {
+    return;
+  }
+
+  const signature = state.mentions
+    .map((mention) => {
+      const status = getMentionStatus(mention);
+
+      const target =
+        status === "locked"
+          ? mention.currentLocker && mention.lockUntil
+            ? timestampForClient(mention.lockUntil)
+            : timestampForClient(mention.unlockAt)
+          : status;
+
+      return `${mention.id}:${status}:${target}`;
+    })
+    .join("|");
+
+  if (signature === lastMentionRenderSignature) {
+    return;
+  }
+
+  lastMentionRenderSignature = signature;
+
+  renderAdminMentions();
+}
+
+function refreshMentionDetailsIfOpen() {
+  const modal = el.mentionDetailsModal;
+
+  if (!modal || !modal.classList.contains("active")) {
+    return;
+  }
+
+  const mentionId = modal.dataset.mentionId;
+
+  if (mentionId) {
+    openMentionDetails(mentionId, false);
+  }
+}
+
+function openMentionDetails(mentionId, openModalAfter = true) {
+  const mention = state.mentions.find((item) => item.id === mentionId);
+
+  if (!mention) {
+    return;
+  }
+
+  const status = getMentionStatus(mention);
+
+  if (el.mentionDetailsModal) {
+    el.mentionDetailsModal.dataset.mentionId = mentionId;
+  }
+
+  if (el.mentionDetailsTitle) {
+    el.mentionDetailsTitle.textContent = "Mention Details";
+  }
+
+  if (!el.mentionDetailsContent) {
+    return;
+  }
+
+  const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+  const completed = Array.isArray(mention.completedBy)
+    ? mention.completedBy
+    : [];
+
+  const history = Array.isArray(mention.history)
+    ? [...mention.history].reverse()
+    : [];
+
+  el.mentionDetailsContent.innerHTML = `
+    <div class="mention-details">
+      <div class="mention-detail-url">
+        <span>Facebook URL</span>
+        <a
+          href="${escapeAttribute(mention.url || "#")}"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ${escapeHtml(mention.url || "—")}
+        </a>
+      </div>
+
+      <div class="mention-details-grid">
+        <div>
+          <span>Created by</span>
+          <strong>
+            ${escapeHtml(mention.createdByName || "Unknown")}
+          </strong>
+        </div>
+
+        <div>
+          <span>Created at</span>
+          <strong>
+            ${formatDateTime(mention.createdAt)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Status</span>
+          ${createMentionStatusBadge(status)}
+        </div>
+
+        <div>
+          <span>Expires</span>
+          <strong>
+            ${formatDateTime(mention.expiresAt)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Lock duration</span>
+          <strong>
+            ${formatDuration(mention.lockDurationMinutes * 60 * 1000)}
+          </strong>
+        </div>
+
+        <div>
+          <span>Cycles</span>
+          <strong>
+            ${mention.cycles || 0}
+          </strong>
+        </div>
+      </div>
+
+      <div class="mention-detail-section">
+        <h3>Participants</h3>
+
+        <div class="participant-list">
+          <div class="participant-item completed">
+            <span>
+              <i class="fa-solid fa-user-check"></i>
+              ${escapeHtml(mention.createdByName || "Creator")}
+            </span>
+
+            <strong>Creator</strong>
+          </div>
+
+          ${completed
+            .map(
+              (item) => `
+                <div class="participant-item completed">
+                  <span>
+                    <i class="fa-solid fa-check"></i>
+                    ${escapeHtml(item.name || "Unknown")}
+                  </span>
+
+                  <strong>
+                    Completed
+                  </strong>
+                </div>
+              `,
+            )
+            .join("")}
+
+          ${queue
+            .map(
+              (item) => `
+                <div class="participant-item pending">
+                  <span>
+                    <i class="fa-regular fa-clock"></i>
+                    ${escapeHtml(item.name || "Unknown")}
+                  </span>
+
+                  <strong>
+                    Waiting
+                  </strong>
+                </div>
+              `,
+            )
+            .join("")}
+
+          ${
+            !queue.length && !completed.length
+              ? `
+                <div class="empty-state">
+                  No participants.
+                </div>
+              `
+              : ""
+          }
+        </div>
+      </div>
+
+      <div class="mention-detail-section">
+        <div class="mention-history-header">
+          <h3>Activity</h3>
+
+          ${
+            status === "expired"
+              ? `
+                <div class="reactivation-actions">
+                  <button
+                    class="secondary-button small"
+                    data-reactivate-mention="${escapeHtml(mention.id)}"
+                    data-extra-time="120"
+                  >
+                    +2h
+                  </button>
+
+                  <button
+                    class="secondary-button small"
+                    data-reactivate-mention="${escapeHtml(mention.id)}"
+                    data-extra-time="240"
+                  >
+                    +4h
+                  </button>
+
+                  <button
+                    class="secondary-button small"
+                    data-reactivate-mention="${escapeHtml(mention.id)}"
+                    data-extra-time="360"
+                  >
+                    +6h
+                  </button>
+
+                  <button
+                    class="secondary-button small"
+                    data-reactivate-mention="${escapeHtml(mention.id)}"
+                    data-extra-time="720"
+                  >
+                    +12h
+                  </button>
+
+                  <button
+                    class="primary-button small"
+                    data-reactivate-mention="${escapeHtml(mention.id)}"
+                    data-extra-time="1440"
+                  >
+                    +24h
+                  </button>
+                </div>
+              `
+              : ""
+          }
+        </div>
+
+        <div class="mention-history">
+          ${
+            history.length
+              ? history
+                  .map(
+                    (event) => `
+                      <div class="history-item">
+                        <div class="history-dot"></div>
+
+                        <div>
+                          <strong>
+                            ${escapeHtml(mentionHistoryLabel(event))}
+                          </strong>
+
+                          <span>
+                            ${formatDateTime(event.timestamp)}
+                          </span>
+                        </div>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : `
+                <div class="empty-state">
+                  No activity yet.
+                </div>
+              `
+          }
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (openModalAfter) {
+    openModal("mentionDetailsModal");
+  }
+}
+
+function mentionHistoryLabel(event) {
+  const name = event.userName || "System";
+
+  const labels = {
+    created: `${name} created the Mention`,
+    claimed: `${name} started execution`,
+    completed: `${name} completed the Mention`,
+    reactivated: `${name} reactivated the Mention`,
+    cycle_locked: `Mention locked for the next cycle`,
+  };
+
+  return labels[event.type] || `${name} performed ${event.type}`;
+}
+
+async function handleCreateMention(event) {
+  event.preventDefault();
+
+  const submitButton = el.mentionForm?.querySelector('button[type="submit"]');
+
+  const url = document.getElementById("mentionUrl")?.value || "";
+
+  const description =
+    document.getElementById("mentionDescription")?.value || "";
+
+  try {
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    await createMention({
+      url,
+      description,
+    });
+
+    el.mentionForm.reset();
+
+    closeModal("mentionModal");
+
+    showToast("Mention created", "The Mention was created successfully.");
+
+    await loadMentionAnalytics();
+  } catch (error) {
+    console.error("Create mention error:", error);
+
+    showToast(
+      "Unable to create Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+  }
+}
+
+async function handleMentionSettings(event) {
+  event.preventDefault();
+
+  const value = Number(el.mentionLockDuration?.value);
+
+  try {
+    await updateMentionSettings(value);
+
+    showToast(
+      "Settings saved",
+      "New Mentions will use the updated lock duration.",
+    );
+  } catch (error) {
+    console.error("Mention settings error:", error);
+
+    showToast(
+      "Unable to save settings",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  }
+}
+
+async function handleReactivateMention(mentionId, minutes) {
+  const labels = {
+    120: "2 hours",
+    240: "4 hours",
+    360: "6 hours",
+    720: "12 hours",
+    1440: "24 hours",
+  };
+
+  const label = labels[minutes] || `${minutes} minutes`;
+
+  const confirmed = window.confirm(`Reactivate this Mention for ${label}?`);
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await reactivateMention(mentionId, minutes);
+
+    showToast(
+      "Mention reactivated",
+      `The Mention is available again for ${label}.`,
+    );
+
+    await loadMentionAnalytics();
+
+    closeModal("mentionDetailsModal");
+  } catch (error) {
+    console.error("Reactivate mention error:", error);
+
+    showToast(
+      "Unable to reactivate Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  }
+}
+
+// ============================================================
 // NAVIGATION
 // ============================================================
 
@@ -947,6 +1810,14 @@ function setupActions() {
 
   el.userForm?.addEventListener("submit", handleCreateUser);
 
+  el.mentionForm?.addEventListener("submit", handleCreateMention);
+
+  el.mentionSettingsForm?.addEventListener("submit", handleMentionSettings);
+
+  el.addMentionButton?.addEventListener("click", () =>
+    openModal("mentionModal"),
+  );
+
   el.editUserForm?.addEventListener("submit", handleEditUser);
 
   document.addEventListener("click", (event) => {
@@ -954,6 +1825,26 @@ function setupActions() {
 
     if (button) {
       openEditUser(button.dataset.editUser);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const detailsButton = event.target.closest("[data-open-mention-details]");
+
+    if (detailsButton) {
+      openMentionDetails(detailsButton.dataset.openMentionDetails);
+
+      return;
+    }
+
+    const reactivateButton = event.target.closest("[data-reactivate-mention]");
+
+    if (reactivateButton) {
+      const mentionId = reactivateButton.dataset.reactivateMention;
+
+      const minutes = Number(reactivateButton.dataset.extraTime || 240);
+
+      handleReactivateMention(mentionId, minutes);
     }
   });
 }
@@ -1128,4 +2019,116 @@ function escapeHtml(value) {
 
 function setLoading(isLoading) {
   state.loading = isLoading;
+}
+
+function escapeAttribute(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+function setupMobileSidebar() {
+  const menuButton = document.getElementById("mobileMenuButton");
+  const closeButton = document.getElementById("mobileSidebarClose");
+  const overlay = document.getElementById("mobileSidebarOverlay");
+
+  if (!menuButton || !closeButton || !overlay) {
+    return;
+  }
+
+  const openSidebar = () => {
+    document.body.classList.add("sidebar-open");
+  };
+
+  const closeSidebar = () => {
+    document.body.classList.remove("sidebar-open");
+  };
+
+  menuButton.addEventListener("click", openSidebar);
+  closeButton.addEventListener("click", closeSidebar);
+  overlay.addEventListener("click", closeSidebar);
+
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.addEventListener("click", closeSidebar);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeSidebar();
+    }
+  });
+}
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+async function setupPushNotifications() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("./firebase-messaging-sw.js");
+
+    await registerPushNotifications();
+
+    await listenForForegroundNotifications((payload) => {
+      console.log("Foreground notification:", payload);
+
+      showNotificationToast(payload);
+    });
+  } catch (error) {
+    console.error("Push notification setup failed:", error);
+  }
+}
+// async function setupPushNotifications() {
+//   if (!("serviceWorker" in navigator)) {
+//     console.log("FCM: Service Worker is not supported.");
+//     return;
+//   }
+
+//   try {
+//     console.log("FCM: Registering service worker...");
+
+//     const registration = await navigator.serviceWorker.register(
+//       "./firebase-messaging-sw.js",
+//     );
+
+//     console.log("FCM: Service worker registered:", registration);
+
+//     console.log(
+//       "FCM: Current notification permission:",
+//       Notification.permission,
+//     );
+
+//     const token = await registerPushNotifications();
+
+//     console.log("FCM: Registration result:", token);
+
+//     await listenForForegroundNotifications((payload) => {
+//       console.log("FCM: Foreground notification:", payload);
+
+//       showNotificationToast(payload);
+//     });
+
+//     console.log("FCM: Foreground listener ready.");
+//   } catch (error) {
+//     console.error("FCM: Push notification setup failed:", error);
+//   }
+// }
+function showNotificationToast(payload) {
+  const notification = payload.notification || {};
+
+  const title = notification.title || "New Notification";
+
+  const message = notification.body || "";
+
+  if (typeof showToast === "function") {
+    showToast(title, message);
+
+    return;
+  }
+
+  console.log(`${title}: ${message}`);
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
+    <link rel="icon" type="image/png" href="assets/images/logo.png" />
     <title>Task Manager — Employee</title>
 
     <!-- Google Font -->
@@ -39,12 +39,19 @@
 
       <aside class="sidebar">
         <div class="brand">
+          <button
+            class="mobile-sidebar-close"
+            id="mobileSidebarClose"
+            aria-label="Close menu"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
           <div class="brand-icon">
-            <i class="fa-solid fa-layer-group"></i>
+            <img src="assets/images/logo.png" alt="Logo" class="brand-mark" />
           </div>
 
           <div>
-            <h2>TaskFlow</h2>
+            <h2>Tasks Manager</h2>
             <span>Employee</span>
           </div>
         </div>
@@ -58,6 +65,11 @@
           <button class="nav-item" data-section="tasks">
             <i class="fa-solid fa-list-check"></i>
             <span>My Tasks</span>
+          </button>
+
+          <button class="nav-item" data-section="mentions">
+            <i class="fa-solid fa-at"></i>
+            <span>Mentions</span>
           </button>
         </nav>
 
@@ -80,8 +92,14 @@
 
         <header class="topbar">
           <div class="mobile-brand">
-            <i class="fa-solid fa-layer-group"></i>
-            <span>TaskFlow</span>
+            <button
+              class="mobile-menu-button"
+              id="mobileMenuButton"
+              aria-label="Open menu"
+            >
+              <i class="fa-solid fa-bars"></i>
+            </button>
+            <span>Tasks Manager</span>
           </div>
 
           <div class="topbar-actions">
@@ -251,6 +269,35 @@
               </div>
             </div>
           </section>
+
+          <!-- ==========================================
+     MENTIONS SECTION
+=========================================== -->
+          <section class="page-section" id="mentionsSection">
+            <div class="page-header">
+              <div>
+                <p class="eyebrow">Mentions</p>
+
+                <h1>Mentions</h1>
+
+                <p class="page-description">
+                  Create and execute shared Facebook Mentions.
+                </p>
+              </div>
+
+              <button class="primary-button" id="employeeAddMentionButton">
+                <i class="fa-solid fa-plus"></i>
+                Create Mention
+              </button>
+            </div>
+
+            <div id="employeeMentionsList" class="mentions-grid">
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Loading mentions...</span>
+              </div>
+            </div>
+          </section>
         </div>
       </main>
     </div>
@@ -355,6 +402,81 @@
       </button>
     </div>
 
+    <!-- =========================================================
+     EMPLOYEE CREATE MENTION MODAL
+========================================================== -->
+    <div class="modal-overlay" id="employeeMentionModal">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <span class="modal-label"> Mention Management </span>
+
+            <h2>Create Mention</h2>
+          </div>
+
+          <button class="modal-close" data-close-employee-mention>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <form id="employeeMentionForm" class="modal-body">
+          <div class="form-group">
+            <label for="employeeMentionUrl"> Facebook Post URL </label>
+
+            <input
+              id="employeeMentionUrl"
+              type="url"
+              placeholder="https://facebook.com/..."
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="employeeMentionDescription"> Notes </label>
+
+            <textarea
+              id="employeeMentionDescription"
+              rows="4"
+              placeholder="Optional notes..."
+            ></textarea>
+          </div>
+
+          <div class="modal-form-footer">
+            <button
+              type="button"
+              class="secondary-button"
+              data-close-employee-mention
+            >
+              Cancel
+            </button>
+
+            <button type="submit" class="primary-button">
+              <i class="fa-solid fa-plus"></i>
+              Create Mention
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="employeeMentionDetailsModal">
+      <div class="modal modal-large">
+        <div class="modal-header">
+          <div>
+            <span class="modal-label"> Mention Details </span>
+
+            <h2>Facebook Mention</h2>
+          </div>
+
+          <button class="modal-close" data-close-employee-details>
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body" id="employeeMentionDetailsContent"></div>
+      </div>
+    </div>
+    <div class="mobile-sidebar-overlay" id="mobileSidebarOverlay"></div>
     <!-- ======================================================
          JAVASCRIPT
     ======================================================= -->
