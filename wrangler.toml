@@ -1,3 +1,9 @@
-name = "archai-tasks-notifications"
+name = "tasks-center"
 main = "worker.js"
 compatibility_date = "2026-09-20"
+
+[vars]
+FIREBASE_PROJECT_ID = "archai-tasks-manager"
+
+[triggers]
+crons = []
