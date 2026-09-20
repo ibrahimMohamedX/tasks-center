@@ -6,4 +6,4 @@ compatibility_date = "2026-09-20"
 FIREBASE_PROJECT_ID = "archai-tasks-manager"
 
 [triggers]
-crons = []
+crons = ["* * * * *"]
