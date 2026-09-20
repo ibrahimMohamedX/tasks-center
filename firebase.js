@@ -1288,28 +1288,30 @@ export async function getMention(mentionId) {
 export async function getMentions() {
   requireAuth();
 
-  const q = query(
-    collection(db, MENTIONS_COLLECTION),
-    orderBy("createdAt", "desc"),
-  );
+  const snapshot = await getDocs(collection(db, MENTIONS_COLLECTION));
 
-  const snapshot = await getDocs(q);
+  return snapshot.docs.map(normalizeMention).sort((a, b) => {
+    const aTime = timestampMillis(a.createdAt) ?? 0;
+    const bTime = timestampMillis(b.createdAt) ?? 0;
 
-  return snapshot.docs.map(normalizeMention);
+    return bTime - aTime;
+  });
 }
 
 export function watchMentions(callback) {
   requireAuth();
 
-  const q = query(
-    collection(db, MENTIONS_COLLECTION),
-    orderBy("createdAt", "desc"),
-  );
-
   return onSnapshot(
-    q,
+    collection(db, MENTIONS_COLLECTION),
     (snapshot) => {
-      callback(snapshot.docs.map(normalizeMention));
+      const mentions = snapshot.docs.map(normalizeMention).sort((a, b) => {
+        const aTime = timestampMillis(a.createdAt) ?? 0;
+        const bTime = timestampMillis(b.createdAt) ?? 0;
+
+        return bTime - aTime;
+      });
+
+      callback(mentions);
     },
     (error) => {
       console.error("Mentions realtime error:", error);

@@ -309,18 +309,22 @@ async function setFirestoreDocumentFields(
   documentPath,
   fields,
 ) {
+  const fieldPaths = Object.keys(fields)
+    .map((fieldPath) => encodeURIComponent(fieldPath))
+    .map((fieldPath) => `updateMask.fieldPaths=${fieldPath}`)
+    .join("&");
+
   const url =
     `https://firestore.googleapis.com/v1/projects/` +
-    `${projectId}/databases/(default)/documents/${documentPath}`;
+    `${projectId}/databases/(default)/documents/${documentPath}` +
+    `?${fieldPaths}`;
 
   const response = await fetch(url, {
     method: "PATCH",
-
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-
     body: JSON.stringify({
       fields,
     }),
