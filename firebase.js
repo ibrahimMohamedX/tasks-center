@@ -416,6 +416,7 @@ function getMentionStatusInternal(mention, now = Date.now()) {
   }
 
   const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
   const completedBy = Array.isArray(mention.completedBy)
     ? mention.completedBy
     : [];
@@ -435,7 +436,14 @@ function getMentionStatusInternal(mention, now = Date.now()) {
 
   const lockUntil = timestampMillis(mention.lockUntil);
 
+  // Active execution lock.
   if (mention.currentLocker && lockUntil !== null && now < lockUntil) {
+    return "locked";
+  }
+
+  // Cooldown between execution cycles.
+  // During this period there is intentionally no currentLocker.
+  if (mention.lockReason === "cycle" && lockUntil !== null && now < lockUntil) {
     return "locked";
   }
 
@@ -1483,6 +1491,7 @@ export async function completeMention(mentionId) {
       throw new Error("انتهت صلاحية هذا الـMention.");
     }
 
+    // Only the current locker can complete the Mention.
     if (!mention.currentLocker || mention.currentLocker.uid !== authUser.uid) {
       throw new Error("أنت لا تملك الـMention حاليًا.");
     }
@@ -1537,13 +1546,14 @@ export async function completeMention(mentionId) {
         Number(mention.lockDurationMinutes) ||
         DEFAULT_MENTION_LOCK_DURATION_MINUTES;
 
-      nextLockUntil = Timestamp.fromDate(
-        new Date(now.toMillis() + lockDurationMinutes * 60 * 1000),
+      nextLockUntil = Timestamp.fromMillis(
+        nowMillis + lockDurationMinutes * 60 * 1000,
       );
     }
 
     const history = [
       ...(Array.isArray(mention.history) ? mention.history : []),
+
       mentionHistoryEvent("completed", authUser.uid, completedEntry.name, {
         completedAt: now,
       }),
@@ -1568,6 +1578,8 @@ export async function completeMention(mentionId) {
 
       totalCompleted: updatedCompletedBy.length,
 
+      // No user owns the Mention during
+      // the cycle cooldown.
       currentLocker: null,
 
       lockUntil: nextLockUntil,
@@ -1593,7 +1605,13 @@ export async function completeMention(mentionId) {
       totalCompleted: updatedCompletedBy.length,
 
       currentLocker: null,
-      lockUntil: null,
+
+      lockUntil: nextLockUntil,
+
+      lockReason: allCompleted ? null : "cycle",
+
+      history,
+
       openNotificationSentAt: null,
     };
   });
@@ -1616,10 +1634,12 @@ export async function reactivateMention(mentionId, extraTimeMinutes) {
   }
 
   const mentionRef = doc(db, MENTIONS_COLLECTION, mentionId);
+
   const userRef = doc(db, USERS_COLLECTION, user.uid);
 
   return await runTransaction(db, async (transaction) => {
     const mentionSnapshot = await transaction.get(mentionRef);
+
     const userSnapshot = await transaction.get(userRef);
 
     if (!mentionSnapshot.exists()) {
@@ -1674,43 +1694,48 @@ export async function reactivateMention(mentionId, extraTimeMinutes) {
       extraTimeMinutes: minutes,
     });
 
-    const updatedMention = {
+    transaction.update(mentionRef, {
+      expiresAt: newExpiresAt,
+
+      // Reactivation does NOT claim the Mention.
+      currentLocker: null,
+
+      lockUntil: null,
+
+      lockReason: null,
+
+      status: "open",
+
+      openNotificationSentAt: null,
+
+      reactivatedAt: now,
+
+      history,
+
+      updatedAt: now,
+    });
+
+    return {
+      id: mentionId,
       ...mention,
 
       expiresAt: newExpiresAt,
 
       currentLocker: null,
+
       lockUntil: null,
+
       lockReason: null,
+
       status: "open",
+
       openNotificationSentAt: null,
+
       reactivatedAt: now,
 
       history,
-    };
 
-    // transaction.set(mentionRef, updatedMention);
-    transaction.set(mentionRef, {
-      ...updatedMention,
-
-      currentLocker: {
-        uid: user.uid,
-        name: profile.name || profile.email || "User",
-        claimedAt: now,
-      },
-
-      lockUntil,
-
-      lockReason: "execution",
-
-      openNotificationSentAt: null,
-
-      status: "locked",
-    });
-
-    return {
-      id: mentionId,
-      ...updatedMention,
+      updatedAt: now,
     };
   });
 }

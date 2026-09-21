@@ -708,50 +708,50 @@ function createEmployeeMentionCard(mention) {
 
   if (completedByMe) {
     action = `
-      <span class="mention-personal-state completed">
+      <span class="mention-personal-state compact completed">
         <i class="fa-solid fa-circle-check"></i>
         Completed by you
       </span>
     `;
   } else if (isCreator) {
     action = `
-      <span class="mention-personal-state creator">
+      <span class="mention-personal-state compact creator">
         <i class="fa-solid fa-user-check"></i>
         You created this Mention
       </span>
     `;
   } else if (claimedByMe) {
     action = `
-      <button
-        type="button"
-        class="primary-button"
-        data-complete-mention="${escapeHtml(mention.id)}"
-      >
-        <i class="fa-solid fa-check"></i>
-        Complete Mention
-      </button>
-    `;
+    <button
+      type="button"
+      class="mention-action mention-action-primary"
+      data-complete-mention="${escapeHtml(mention.id)}"
+    >
+      <i class="fa-solid fa-check"></i>
+      Complete
+    </button>
+  `;
   } else if (pendingForMe && status === "open") {
     action = `
-      <button
-        type="button"
-        class="primary-button"
-        data-claim-mention="${escapeHtml(mention.id)}"
-      >
-        <i class="fa-solid fa-play"></i>
-        Execute Mention
-      </button>
-    `;
+    <button
+      type="button"
+      class="mention-action mention-action-primary"
+      data-claim-mention="${escapeHtml(mention.id)}"
+    >
+      <i class="fa-solid fa-play"></i>
+      Execute
+    </button>
+  `;
   } else if (pendingForMe && status === "locked") {
     action = `
-      <span class="mention-personal-state waiting">
+      <span class="mention-personal-state compact waiting">
         <i class="fa-solid fa-lock"></i>
         Waiting for availability
       </span>
     `;
   } else if (!pendingForMe && !completedByMe && !isCreator) {
     action = `
-      <span class="mention-personal-state">
+      <span class="mention-personal-state compact">
         Not required
       </span>
     `;
@@ -920,10 +920,9 @@ function getEmployeeMentionCountdown(mention) {
     return "Completed";
   }
 
-  const target =
-    mention.currentLocker && mention.lockUntil
-      ? convertFirebaseDate(mention.lockUntil)
-      : convertFirebaseDate(mention.unlockAt);
+  const target = mention.lockUntil
+    ? convertFirebaseDate(mention.lockUntil)
+    : convertFirebaseDate(mention.unlockAt);
 
   if (!target) {
     return "Waiting...";
@@ -935,9 +934,11 @@ function getEmployeeMentionCountdown(mention) {
     return "Updating...";
   }
 
-  return `${
-    mention.currentLocker ? "Currently locked · " : "Opens in "
-  }${formatMentionDuration(diff)}`;
+  if (mention.currentLocker && mention.lockReason === "execution") {
+    return `Currently locked · ${formatMentionDuration(diff)}`;
+  }
+
+  return `Opens in ${formatMentionDuration(diff)}`;
 }
 
 function formatMentionDuration(milliseconds) {

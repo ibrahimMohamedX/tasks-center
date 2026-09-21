@@ -2623,3 +2623,55 @@ tbody tr:last-child td {
     justify-content: flex-end;
   }
 }
+/* ============================================================
+   MENTION CARD - COMPACT ACTIONS
+   ============================================================ */
+
+.mention-card .mention-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  height: 27px;
+  padding: 0 8px;
+
+  border-radius: 7px;
+  border: 1px solid transparent;
+
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mention-card .mention-action-primary {
+  background: #111827;
+  color: #ffffff;
+}
+
+.mention-card .mention-action-secondary {
+  background: #ffffff;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.mention-card .mention-personal-state.compact {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 4px;
+
+  height: 27px;
+  padding: 0 7px;
+
+  border-radius: 7px;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}

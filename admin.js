@@ -1066,9 +1066,31 @@ function createAdminMentionCard(mention) {
 
   const completedByMe = completed.some((item) => item.uid === currentUid);
 
+  const pendingForMe = queue.some((item) => item.uid === currentUid);
+
   let action = "";
 
-  if (claimedByMe && !completedByMe) {
+  /*
+   * The Admin follows the exact same execution lifecycle
+   * as an Employee.
+   *
+   * OPEN + pending for me
+   *       ↓
+   * Execute / Claim
+   *       ↓
+   * currentLocker = me
+   *       ↓
+   * Complete
+   */
+
+  if (completedByMe) {
+    action = `
+      <span class="mention-personal-state completed">
+        <i class="fa-solid fa-circle-check"></i>
+        Completed by you
+      </span>
+    `;
+  } else if (claimedByMe) {
     action = `
       <button
         type="button"
@@ -1079,10 +1101,26 @@ function createAdminMentionCard(mention) {
         Complete
       </button>
     `;
-  }
-
-  if (status === "expired") {
-    action += `
+  } else if (pendingForMe && status === "open") {
+    action = `
+      <button
+        type="button"
+        class="mention-action mention-action-primary"
+        data-claim-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-play"></i>
+        Execute
+      </button>
+    `;
+  } else if (pendingForMe && status === "locked") {
+    action = `
+      <span class="mention-personal-state waiting">
+        <i class="fa-solid fa-lock"></i>
+        Waiting for availability
+      </span>
+    `;
+  } else if (status === "expired") {
+    action = `
       <button
         type="button"
         class="mention-action mention-action-primary"
@@ -1198,10 +1236,7 @@ function createMentionStatusBadge(status) {
 }
 
 function createMentionTimerHtml(mention) {
-  const target =
-    mention.currentLocker && mention.lockUntil
-      ? mention.lockUntil
-      : mention.unlockAt;
+  const target = mention.lockUntil || mention.unlockAt;
 
   return `
     <span
@@ -1223,7 +1258,6 @@ function timestampForClient(value) {
 
 function getMentionCountdownText(mention) {
   const status = getMentionStatus(mention);
-
   const now = Date.now();
 
   if (status === "open") {
@@ -1238,10 +1272,9 @@ function getMentionCountdownText(mention) {
     return "Completed";
   }
 
-  const target =
-    mention.currentLocker && mention.lockUntil
-      ? convertFirebaseDate(mention.lockUntil)
-      : convertFirebaseDate(mention.unlockAt);
+  const target = mention.lockUntil
+    ? convertFirebaseDate(mention.lockUntil)
+    : convertFirebaseDate(mention.unlockAt);
 
   if (!target) {
     return "Waiting...";
@@ -1253,9 +1286,11 @@ function getMentionCountdownText(mention) {
     return "Updating...";
   }
 
-  return `${
-    mention.currentLocker ? "Locked for " : "Opens in "
-  }${formatDuration(diff)}`;
+  if (mention.currentLocker && mention.lockReason === "execution") {
+    return `Locked for ${formatDuration(diff)}`;
+  }
+
+  return `Opens in ${formatDuration(diff)}`;
 }
 
 function formatDuration(ms) {
@@ -1668,6 +1703,18 @@ async function handleMentionSettings(event) {
   }
 }
 
+async function handleClaimMention(mentionId) {
+  try {
+    await claimMention(mentionId);
+
+    showToast("Mention claimed", "You can now execute this Mention.");
+  } catch (error) {
+    console.error("Claim Mention error:", error);
+
+    showToast("Mention unavailable", getReadableFirebaseError(error), "error");
+  }
+}
+
 async function handleCompleteMention(mentionId) {
   try {
     await completeMention(mentionId);
@@ -1852,6 +1899,14 @@ function setupActions() {
 
     if (completeButton) {
       handleCompleteMention(completeButton.dataset.completeMention);
+
+      return;
+    }
+
+    const claimButton = event.target.closest("[data-claim-mention]");
+
+    if (claimButton) {
+      handleClaimMention(claimButton.dataset.claimMention);
 
       return;
     }
