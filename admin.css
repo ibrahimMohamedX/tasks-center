@@ -1763,6 +1763,25 @@ tbody tr:last-child td {
   font-size: 8px;
   line-height: 1;
 }
+.mention-status-badge.open {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.mention-status-badge.locked {
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.mention-status-badge.expired {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.mention-status-badge.completed {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
 
 /* Info */
 
@@ -1910,7 +1929,34 @@ tbody tr:last-child td {
 
   white-space: nowrap;
 }
+.mention-personal-state.compact.completed {
+  color: #047857;
+  background: #ecfdf5;
+}
 
+.mention-personal-state.compact.creator {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.mention-personal-state.compact.waiting {
+  color: #92400e;
+  background: #fffbeb;
+}
+.mention-personal-state.compact.completed {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.mention-personal-state.compact.creator {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.mention-personal-state.compact.waiting {
+  color: #92400e;
+  background: #fffbeb;
+}
 /* ============================================================
    TABLET
    ============================================================ */
@@ -2674,4 +2720,18 @@ tbody tr:last-child td {
   font-weight: 700;
 
   white-space: nowrap;
+}
+.mention-personal-state.compact.completed {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.mention-personal-state.compact.creator {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.mention-personal-state.compact.waiting {
+  color: #92400e;
+  background: #fffbeb;
 }

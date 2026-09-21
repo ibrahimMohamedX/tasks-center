@@ -2166,6 +2166,7 @@ a {
     margin-left: 0 !important;
   }
 }
+
 /* ============================================================
    COMPACT MENTION CARDS
    ============================================================ */
@@ -2369,4 +2370,505 @@ a {
   font-weight: 700;
 
   white-space: nowrap;
+}
+
+/* ============================================================
+   MENTION CARDS — COMPACT & RESPONSIVE
+   ============================================================ */
+
+.mentions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+/* Card */
+.mention-card {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  padding: 14px;
+  border-radius: 12px;
+
+  overflow: hidden;
+}
+
+/* Header */
+.mention-card .mention-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  min-width: 0;
+}
+
+.mention-card .mention-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Type */
+.mention-card .mention-type {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin: 0 0 4px;
+
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+/* URL / Title */
+.mention-card .mention-main h3 {
+  display: block;
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+
+  margin: 0;
+
+  font-size: 13px;
+  line-height: 1.35;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status */
+.mention-card .mention-status-badge {
+  flex: 0 0 auto;
+
+  padding: 4px 7px;
+
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Description */
+.mention-card .mention-description {
+  width: 100%;
+  min-width: 0;
+
+  margin: 8px 0 0;
+
+  font-size: 11px;
+  line-height: 1.4;
+
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+
+  overflow: hidden;
+}
+
+/* Compact metadata */
+.mention-card .mention-compact-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 5px 10px;
+
+  width: 100%;
+  min-width: 0;
+
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.mention-card .mention-compact-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  min-width: 0;
+
+  white-space: nowrap;
+}
+
+.mention-card .mention-compact-meta i {
+  flex: 0 0 auto;
+  font-size: 9px;
+}
+
+/* Status colors */
+.mention-card .mention-compact-countdown {
+  color: #c2410c;
+}
+
+.mention-card .mention-compact-open {
+  color: #047857;
+}
+
+.mention-card .mention-compact-expired {
+  color: #b91c1c;
+}
+
+.mention-card .mention-compact-completed {
+  color: #1d4ed8;
+}
+
+/* Footer */
+.mention-card .mention-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  width: 100%;
+  min-width: 0;
+
+  margin-top: 10px;
+  padding-top: 9px;
+
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Queue summary */
+.mention-card .mention-queue-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+
+  font-size: 10px;
+  line-height: 1.2;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Actions */
+.mention-card .mention-actions {
+  display: flex;
+  align-items: center;
+
+  flex: 0 0 auto;
+
+  gap: 5px;
+
+  min-width: 0;
+}
+
+/*
+   IMPORTANT:
+   لا نعدل .primary-button.small أو
+   .secondary-button.small بشكل عام.
+   التعديل هنا scoped للكارت فقط.
+*/
+.mention-card .mention-actions .primary-button.small,
+.mention-card .mention-actions .secondary-button.small {
+  flex: 0 0 auto;
+
+  min-height: 30px;
+  padding: 5px 9px;
+
+  font-size: 10px;
+  line-height: 1;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+  .mentions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mention-card {
+    padding: 12px;
+  }
+
+  .mention-card .mention-card-header {
+    gap: 7px;
+  }
+
+  .mention-card .mention-status-badge {
+    font-size: 8px;
+    padding: 4px 6px;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 5px 8px;
+  }
+}
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 640px) {
+  .mentions-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .mention-card {
+    width: 100%;
+    max-width: 100%;
+
+    padding: 12px;
+  }
+
+  .mention-card .mention-card-header {
+    align-items: flex-start;
+  }
+
+  .mention-card .mention-main {
+    min-width: 0;
+  }
+
+  .mention-card .mention-main h3 {
+    font-size: 12px;
+  }
+
+  .mention-card .mention-description {
+    font-size: 10px;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 6px 9px;
+  }
+
+  .mention-card .mention-card-footer {
+    align-items: center;
+  }
+
+  .mention-card .mention-queue-summary {
+    max-width: 45%;
+  }
+
+  .mention-card .mention-actions {
+    max-width: 55%;
+  }
+
+  .mention-card .mention-actions .primary-button.small,
+  .mention-card .mention-actions .secondary-button.small {
+    min-height: 29px;
+    padding: 5px 8px;
+
+    font-size: 9px;
+  }
+}
+
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+  .mention-card {
+    padding: 10px;
+  }
+
+  .mention-card .mention-status-badge {
+    max-width: 75px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mention-card .mention-compact-meta {
+    gap: 5px 7px;
+    font-size: 9px;
+  }
+
+  .mention-card .mention-card-footer {
+    flex-wrap: wrap;
+  }
+
+  .mention-card .mention-queue-summary {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mention-card .mention-actions {
+    width: 100%;
+    max-width: 100%;
+
+    justify-content: flex-end;
+  }
+}
+/* ============================================================
+   MENTION CARD - COMPACT ACTIONS
+   ============================================================ */
+
+.mention-card .mention-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 4px;
+
+  height: 27px;
+  padding: 0 8px;
+
+  border-radius: 7px;
+  border: 1px solid transparent;
+
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mention-card .mention-action-primary {
+  background: #111827;
+  color: #ffffff;
+}
+
+.mention-card .mention-action-secondary {
+  background: #ffffff;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+.mention-card .mention-personal-state.compact {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 4px;
+
+  height: 27px;
+  padding: 0 7px;
+
+  border-radius: 7px;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  white-space: nowrap;
+}
+/* =========================================================
+   Employee Mention Card — Admin-aligned compact layout
+   ========================================================= */
+
+.mention-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  min-width: 0;
+}
+
+.mention-card-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.mention-card-title h3 {
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+
+  margin: 3px 0 0;
+
+  font-size: 12px;
+  line-height: 1.3;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-card-info {
+  display: flex;
+  align-items: center;
+
+  gap: 6px 10px;
+
+  margin-top: 8px;
+
+  min-width: 0;
+
+  color: #6b7280;
+
+  font-size: 9px;
+  line-height: 1.2;
+
+  overflow: hidden;
+}
+
+.mention-card-info > span {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 3px;
+
+  min-width: 0;
+
+  white-space: nowrap;
+}
+
+.mention-card-info i {
+  flex-shrink: 0;
+
+  font-size: 8px;
+}
+
+.mention-card-info > span:not(:last-child)::after {
+  content: "•";
+
+  margin-left: 4px;
+
+  color: #d1d5db;
+}
+
+.mention-card-time {
+  color: #c2410c;
+}
+
+.mention-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 8px;
+
+  margin-top: 9px;
+  padding-top: 8px;
+
+  border-top: 1px solid #f1f5f9;
+}
+
+.mention-card-progress {
+  min-width: 0;
+
+  color: #9ca3af;
+
+  font-size: 9px;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mention-card-actions {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+
+  flex-shrink: 0;
 }

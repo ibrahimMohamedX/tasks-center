@@ -1062,6 +1062,8 @@ function createAdminMentionCard(mention) {
 
   const currentUid = state.authUser?.uid;
 
+  const isCreator = mention.createdBy === currentUid;
+
   const claimedByMe = mention.currentLocker?.uid === currentUid;
 
   const completedByMe = completed.some((item) => item.uid === currentUid);
@@ -1085,9 +1087,16 @@ function createAdminMentionCard(mention) {
 
   if (completedByMe) {
     action = `
-      <span class="mention-personal-state completed">
+      <span class="mention-personal-state compact completed">
         <i class="fa-solid fa-circle-check"></i>
         Completed by you
+      </span>
+    `;
+  } else if (isCreator) {
+    action = `
+      <span class="mention-personal-state compact creator">
+        <i class="fa-solid fa-user-check"></i>
+        You created this Mention
       </span>
     `;
   } else if (claimedByMe) {
@@ -1114,17 +1123,26 @@ function createAdminMentionCard(mention) {
     `;
   } else if (pendingForMe && status === "locked") {
     action = `
-      <span class="mention-personal-state waiting">
+      <span class="mention-personal-state compact waiting">
         <i class="fa-solid fa-lock"></i>
         Waiting for availability
       </span>
     `;
-  } else if (status === "expired") {
+  } else if (!pendingForMe && !completedByMe && !isCreator) {
     action = `
+      <span class="mention-personal-state compact">
+        Not required
+      </span>
+    `;
+  }
+
+  if (status === "expired") {
+    action += `
       <button
         type="button"
         class="mention-action mention-action-primary"
         data-reactivate-mention="${escapeHtml(mention.id)}"
+        data-extra-time="240"
       >
         <i class="fa-solid fa-rotate"></i>
         Reactivate

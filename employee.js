@@ -704,6 +704,8 @@ function createEmployeeMentionCard(mention) {
 
   const claimedByMe = mention.currentLocker?.uid === currentUid;
 
+  const locker = mention.currentLocker?.name || "";
+
   let action = "";
 
   if (completedByMe) {
@@ -722,26 +724,26 @@ function createEmployeeMentionCard(mention) {
     `;
   } else if (claimedByMe) {
     action = `
-    <button
-      type="button"
-      class="mention-action mention-action-primary"
-      data-complete-mention="${escapeHtml(mention.id)}"
-    >
-      <i class="fa-solid fa-check"></i>
-      Complete
-    </button>
-  `;
+      <button
+        type="button"
+        class="mention-action mention-action-primary"
+        data-complete-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-check"></i>
+        Complete
+      </button>
+    `;
   } else if (pendingForMe && status === "open") {
     action = `
-    <button
-      type="button"
-      class="mention-action mention-action-primary"
-      data-claim-mention="${escapeHtml(mention.id)}"
-    >
-      <i class="fa-solid fa-play"></i>
-      Execute
-    </button>
-  `;
+      <button
+        type="button"
+        class="mention-action mention-action-primary"
+        data-claim-mention="${escapeHtml(mention.id)}"
+      >
+        <i class="fa-solid fa-play"></i>
+        Execute
+      </button>
+    `;
   } else if (pendingForMe && status === "locked") {
     action = `
       <span class="mention-personal-state compact waiting">
@@ -757,135 +759,113 @@ function createEmployeeMentionCard(mention) {
     `;
   }
 
-  const locker = mention.currentLocker?.name || "";
-
   return `
     <article
       class="mention-card"
       data-employee-mention-details="${escapeHtml(mention.id)}"
     >
-      <div class="mention-card-header">
-        <div>
+
+      <div class="mention-card-top">
+
+        <div class="mention-card-title">
+
           <span class="mention-type">
             <i class="fa-solid fa-at"></i>
             Facebook Mention
           </span>
 
-          <h3>
+          <h3 title="${escapeAttribute(mention.url || "")}">
             ${escapeHtml(mention.url || "Unknown URL")}
           </h3>
+
         </div>
 
         ${createEmployeeMentionBadge(status)}
+
       </div>
 
-      ${
-        mention.description
-          ? `
-            <p class="mention-description">
-              ${escapeHtml(mention.description)}
-            </p>
-          `
-          : ""
-      }
+      <div class="mention-card-info">
 
-      <div class="mention-meta-grid">
-        <div>
-          <span>Created by</span>
-          <strong>
-            ${escapeHtml(mention.createdByName || "Unknown")}
-          </strong>
-        </div>
+        <span>
+          <i class="fa-solid fa-user"></i>
+          ${escapeHtml(mention.createdByName || "Unknown")}
+        </span>
 
-        <div>
-          <span>Expires</span>
-          <strong>
-            ${formatDateTime(mention.expiresAt)}
-          </strong>
-        </div>
-
-        <div>
-          <span>Progress</span>
-          <strong>
-            ${mention.totalCompleted || completedBy.length}
-            /
-            ${mention.totalParticipants || 0}
-          </strong>
-        </div>
-
-        <div>
-          <span>Cycles</span>
-          <strong>
-            ${mention.cycles || 0}
-          </strong>
-        </div>
-      </div>
-
-      <div class="mention-status-line">
-        ${
-          status === "locked"
-            ? `
-              <span
-                class="mention-countdown"
-                data-employee-countdown="${escapeHtml(mention.id)}"
-                data-status="${escapeHtml(status)}"
-                >
-                ${getEmployeeMentionCountdown(mention)}
-              </span>
-            `
-            : status === "open"
-              ? `
-                <span class="mention-open-text">
-                  <i class="fa-solid fa-circle"></i>
-                  Available now
-                </span>
-              `
-              : status === "expired"
-                ? `
-                  <span>
-                    <i class="fa-solid fa-clock"></i>
-                    Expired
-                  </span>
-                `
-                : `
-                  <span>
-                    <i class="fa-solid fa-check-double"></i>
-                    Completed
-                  </span>
-                `
-        }
+        <span>
+          <i class="fa-solid fa-users"></i>
+          ${completedBy.length}/${mention.totalParticipants || 0}
+        </span>
 
         ${
           locker
             ? `
               <span>
-                <i class="fa-solid fa-user-lock"></i>
+                <i class="fa-solid fa-lock"></i>
                 ${escapeHtml(locker)}
               </span>
             `
             : ""
         }
-      </div>
 
-      <div class="mention-card-footer">
-        <span>
-          ${queue.length} pending
-          ·
-          ${completedBy.length} completed
+        <span class="mention-card-time">
+          ${
+            status === "locked"
+              ? `
+                <span
+                  class="mention-countdown"
+                  data-employee-countdown="${escapeHtml(mention.id)}"
+                  data-status="${escapeHtml(status)}"
+                >
+                  ${getEmployeeMentionCountdown(mention)}
+                </span>
+              `
+              : status === "open"
+                ? `
+                  <span class="mention-open-text">
+                    <i class="fa-solid fa-circle"></i>
+                    Available now
+                  </span>
+                `
+                : status === "expired"
+                  ? `
+                    <span>
+                      <i class="fa-solid fa-clock"></i>
+                      Expired
+                    </span>
+                  `
+                  : `
+                    <span>
+                      <i class="fa-solid fa-check-double"></i>
+                      Completed
+                    </span>
+                  `
+          }
         </span>
 
-        <div class="mention-actions">
+      </div>
+
+      <div class="mention-card-bottom">
+
+        <span class="mention-card-progress">
+          ${queue.length} pending · ${completedBy.length} completed
+        </span>
+
+        <div class="mention-card-actions">
+
           ${action}
 
           <button
             type="button"
-            class="secondary-button small"
+            class="mention-action mention-action-secondary"
             data-employee-details="${escapeHtml(mention.id)}"
           >
             Details
           </button>
+
         </div>
+
       </div>
+
     </article>
   `;
 }
