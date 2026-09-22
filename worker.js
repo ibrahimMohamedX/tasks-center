@@ -207,6 +207,70 @@ function firestoreDocumentToObject(document) {
 
   return result;
 }
+function getMentionStatus(mention, now = Date.now()) {
+  if (!mention) {
+    return "unknown";
+  }
+
+  const expiresAt = mention.expiresAt
+    ? new Date(mention.expiresAt).getTime()
+    : null;
+
+  if (expiresAt !== null && !Number.isNaN(expiresAt) && now >= expiresAt) {
+    return "expired";
+  }
+
+  const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+  const completedBy = Array.isArray(mention.completedBy)
+    ? mention.completedBy
+    : [];
+
+  const totalParticipants =
+    typeof mention.totalParticipants === "number"
+      ? mention.totalParticipants
+      : queue.length + completedBy.length;
+
+  if (
+    totalParticipants > 0 &&
+    completedBy.length >= totalParticipants &&
+    queue.length === 0
+  ) {
+    return "completed";
+  }
+
+  const lockUntil = mention.lockUntil
+    ? new Date(mention.lockUntil).getTime()
+    : null;
+
+  if (
+    mention.currentLocker &&
+    lockUntil !== null &&
+    !Number.isNaN(lockUntil) &&
+    now < lockUntil
+  ) {
+    return "locked";
+  }
+
+  if (
+    mention.lockReason === "cycle" &&
+    lockUntil !== null &&
+    !Number.isNaN(lockUntil) &&
+    now < lockUntil
+  ) {
+    return "locked";
+  }
+
+  const unlockAt = mention.unlockAt
+    ? new Date(mention.unlockAt).getTime()
+    : null;
+
+  if (unlockAt !== null && !Number.isNaN(unlockAt) && now < unlockAt) {
+    return "locked";
+  }
+
+  return "open";
+}
 
 async function sendFcmNotification({
   accessToken,
@@ -746,48 +810,127 @@ export default {
        * --------------------------------------------------
        */
 
+      // for (const document of mentionDocuments) {
+      //   const mention = firestoreDocumentToObject(document);
+
+      //   const alreadySent = document.fields?.notificationSentAt;
+
+      //   if (alreadySent) {
+      //     console.log(
+      //       `Skipping mention ${mention.id} - notification already sent.`,
+      //     );
+
+      //     continue;
+      //   }
+
+      //   const mentionType = mention.type || "Mention";
+
+      //   const mentionUrl = mention.url || "";
+
+      //   const title = "New Mention 🔔";
+
+      //   const body = mentionUrl
+      //     ? `${mentionType}: ${mentionUrl}`
+      //     : `A new ${mentionType} is available.`;
+
+      //   console.log(`Sending mention notification: ${mention.id}`);
+
+      //   // const tokenDocuments = await getFirestoreDocuments(
+      //   //   accessToken,
+      //   //   projectId,
+      //   //   "fcmTokens",
+      //   // );
+
+      //   // const activeTokens = tokenDocuments
+      //   //   .map((tokenDocument) => {
+      //   //     const fields = tokenDocument.fields || {};
+
+      //   //     return {
+      //   //       token: getFirestoreFieldValue(fields, "token"),
+
+      //   //       active: getFirestoreFieldValue(fields, "active"),
+      //   //     };
+      //   //   })
+      //   //   .filter((item) => item.active === true && item.token);
+
+      //   for (const target of activeTokens) {
+      //     try {
+      //       await sendFcmNotification({
+      //         accessToken,
+      //         projectId,
+      //         token: target.token,
+
+      //         title,
+
+      //         body,
+
+      //         data: {
+      //           type: "mention_created",
+      //           mentionId: mention.id,
+      //         },
+      //       });
+      //     } catch (error) {
+      //       console.error(
+      //         `Failed to send mention notification to token:`,
+      //         error,
+      //       );
+      //     }
+      //   }
+
+      //   await markNotificationSent(
+      //     accessToken,
+      //     projectId,
+      //     "mentions",
+      //     mention.id,
+      //   );
+
+      //   console.log(`Mention ${mention.id} marked as notified.`);
+      // }
+      /*
+       * --------------------------------------------------
+       * MENTION OPEN NOTIFICATIONS
+       * --------------------------------------------------
+       */
+
+      mentionDocuments = await getFirestoreDocuments(
+        accessToken,
+        projectId,
+        "mentions",
+      );
+
+      console.log(
+        `Checking ${mentionDocuments.length} mention(s) for open state.`,
+      );
+
       for (const document of mentionDocuments) {
         const mention = firestoreDocumentToObject(document);
 
-        const alreadySent = document.fields?.notificationSentAt;
+        const status = getMentionStatus(mention);
+
+        if (status !== "open") {
+          continue;
+        }
+
+        const alreadySent = document.fields?.openNotificationSentAt;
 
         if (alreadySent) {
           console.log(
-            `Skipping mention ${mention.id} - notification already sent.`,
+            `Skipping mention ${mention.id} - open notification already sent.`,
           );
 
           continue;
         }
 
         const mentionType = mention.type || "Mention";
-
         const mentionUrl = mention.url || "";
 
-        const title = "New Mention 🔔";
+        const title = "Mention Available 🔔";
 
         const body = mentionUrl
           ? `${mentionType}: ${mentionUrl}`
-          : `A new ${mentionType} is available.`;
+          : `A ${mentionType} is now available.`;
 
-        console.log(`Sending mention notification: ${mention.id}`);
-
-        // const tokenDocuments = await getFirestoreDocuments(
-        //   accessToken,
-        //   projectId,
-        //   "fcmTokens",
-        // );
-
-        // const activeTokens = tokenDocuments
-        //   .map((tokenDocument) => {
-        //     const fields = tokenDocument.fields || {};
-
-        //     return {
-        //       token: getFirestoreFieldValue(fields, "token"),
-
-        //       active: getFirestoreFieldValue(fields, "active"),
-        //     };
-        //   })
-        //   .filter((item) => item.active === true && item.token);
+        console.log(`Sending open mention notification: ${mention.id}`);
 
         for (const target of activeTokens) {
           try {
@@ -797,30 +940,33 @@ export default {
               token: target.token,
 
               title,
-
               body,
 
               data: {
-                type: "mention_created",
+                type: "mention_open",
                 mentionId: mention.id,
               },
             });
           } catch (error) {
             console.error(
-              `Failed to send mention notification to token:`,
+              `Failed to send open mention notification to token:`,
               error,
             );
           }
         }
 
-        await markNotificationSent(
+        await setFirestoreDocumentFields(
           accessToken,
           projectId,
-          "mentions",
-          mention.id,
+          `mentions/${mention.id}`,
+          {
+            openNotificationSentAt: {
+              timestampValue: new Date().toISOString(),
+            },
+          },
         );
 
-        console.log(`Mention ${mention.id} marked as notified.`);
+        console.log(`Mention ${mention.id} marked as open-notified.`);
       }
 
       /*

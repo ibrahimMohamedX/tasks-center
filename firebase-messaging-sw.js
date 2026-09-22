@@ -21,22 +21,6 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   console.log("[firebase-messaging-sw.js] Background message:", payload);
-
-  const notification = payload.notification || {};
-
-  const title = notification.title || "New Notification";
-
-  const options = {
-    body: notification.body || "You have a new notification.",
-
-    icon: "/favicon.ico",
-
-    badge: "/favicon.ico",
-
-    data: payload.data || {},
-  };
-
-  self.registration.showNotification(title, options);
 });
 
 self.addEventListener("notificationclick", (event) => {
