@@ -907,6 +907,10 @@ export default {
 
         const status = getMentionStatus(mention);
 
+        console.log(
+          `Mention ${mention.id}: status=${status}, unlockAt=${mention.unlockAt}, lockUntil=${mention.lockUntil}, currentLocker=${mention.currentLocker}, openNotificationSentAt=${mention.openNotificationSentAt}`,
+        );
+
         if (status !== "open") {
           continue;
         }
