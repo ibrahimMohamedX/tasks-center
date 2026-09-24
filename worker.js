@@ -134,24 +134,43 @@ async function getFirebaseServiceAccount(env) {
 }
 
 async function getFirestoreDocuments(accessToken, projectId, collectionName) {
-  const url =
-    `https://firestore.googleapis.com/v1/` +
-    `projects/${projectId}/databases/(default)/documents/` +
-    `${collectionName}?pageSize=100`;
+  const documents = [];
+  let pageToken = null;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  do {
+    let url =
+      `https://firestore.googleapis.com/v1/` +
+      `projects/${projectId}/databases/(default)/documents/` +
+      `${collectionName}?pageSize=100`;
 
-  const data = await response.json();
+    if (pageToken) {
+      url += `&pageToken=${encodeURIComponent(pageToken)}`;
+    }
 
-  if (!response.ok) {
-    throw new Error(`Firestore error: ${JSON.stringify(data)}`);
-  }
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  return data.documents || [];
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`Firestore error: ${JSON.stringify(data)}`);
+    }
+
+    if (Array.isArray(data.documents)) {
+      documents.push(...data.documents);
+    }
+
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+
+  console.log(
+    `Firestore collection "${collectionName}" fetched ${documents.length} document(s).`,
+  );
+
+  return documents;
 }
 
 async function runFirestoreQuery(accessToken, projectId, structuredQuery) {
@@ -919,8 +938,12 @@ export default {
         if (status !== "open") {
           continue;
         }
+        console.log(
+          `Raw notification field for ${mention.id}:`,
+          JSON.stringify(document.fields?.openNotificationSentAt ?? null),
+        );
 
-        const alreadySent = document.fields?.openNotificationSentAt;
+        const alreadySent = mention.openNotificationSentAt;
 
         if (alreadySent) {
           console.log(
