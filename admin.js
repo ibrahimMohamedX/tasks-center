@@ -1753,9 +1753,16 @@ async function handleCompleteMention(mentionId) {
 
 async function handleReactivateMention(mentionId, minutes) {
   const labels = {
+    1: "1 minutes",
+    5: "5 minutes",
+    30: "30 minutes",
+    60: "1 hours",
     120: "2 hours",
+    180: "3 hours",
     240: "4 hours",
+    300: "5 hours",
     360: "6 hours",
+    480: "8 hours",
     720: "12 hours",
     1440: "24 hours",
   };

@@ -892,17 +892,17 @@ export default {
        * --------------------------------------------------
        */
 
-      mentionDocuments = await getFirestoreDocuments(
+      const openMentionDocuments = await getFirestoreDocuments(
         accessToken,
         projectId,
         "mentions",
       );
 
       console.log(
-        `Checking ${mentionDocuments.length} mention(s) for open state.`,
+        `Checking ${openMentionDocuments.length} mention(s) for open state.`,
       );
 
-      for (const document of mentionDocuments) {
+      for (const document of openMentionDocuments) {
         const mention = firestoreDocumentToObject(document);
 
         const status = getMentionStatus(mention);
