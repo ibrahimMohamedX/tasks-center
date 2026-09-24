@@ -828,6 +828,8 @@ button {
   justify-content: center;
 
   gap: 8px;
+  width: 130px;
+  align-self: end;
 }
 
 .primary-button:hover {
@@ -2734,4 +2736,11 @@ tbody tr:last-child td {
 .mention-personal-state.compact.waiting {
   color: #92400e;
   background: #fffbeb;
+}
+/*! edit css */
+.section-card mention-settings-card mention-settings-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
 }
