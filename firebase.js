@@ -1435,6 +1435,10 @@ export async function claimMention(mentionId) {
       lockUntil,
       lockReason: "execution",
 
+      // The next time this Mention becomes open,
+      // a new notification must be allowed.
+      openNotificationSentAt: null,
+
       cycles: nextCycles + 1,
 
       queue: updatedQueue,
@@ -1585,6 +1589,7 @@ export async function completeMention(mentionId) {
       lockUntil: nextLockUntil,
 
       lockReason: allCompleted ? null : "cycle",
+      openNotificationSentAt: null,
 
       history,
 
