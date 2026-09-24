@@ -897,6 +897,10 @@ export default {
         projectId,
         "mentions",
       );
+      console.log(
+        "Fetched mention IDs:",
+        openMentionDocuments.map((document) => document.name?.split("/").pop()),
+      );
 
       console.log(
         `Checking ${openMentionDocuments.length} mention(s) for open state.`,
