@@ -2738,7 +2738,7 @@ tbody tr:last-child td {
   background: #fffbeb;
 }
 /*! edit css */
-.section-card mention-settings-card mention-settings-form {
+#mentionSettingsForm {
   display: flex;
   flex-direction: column;
   justify-content: space-between;

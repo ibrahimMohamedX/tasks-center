@@ -897,13 +897,14 @@ export default {
         projectId,
         "mentions",
       );
-      console.log(
-        "Fetched mention IDs:",
-        openMentionDocuments.map((document) => document.name?.split("/").pop()),
-      );
 
       console.log(
         `Checking ${openMentionDocuments.length} mention(s) for open state.`,
+      );
+
+      console.log(
+        "Fetched mention IDs:",
+        openMentionDocuments.map((document) => document.name?.split("/").pop()),
       );
 
       for (const document of openMentionDocuments) {
@@ -940,6 +941,8 @@ export default {
 
         console.log(`Sending open mention notification: ${mention.id}`);
 
+        let notificationSent = false;
+
         for (const target of activeTokens) {
           try {
             await sendFcmNotification({
@@ -955,12 +958,26 @@ export default {
                 mentionId: mention.id,
               },
             });
+
+            notificationSent = true;
+
+            console.log(
+              `Open mention notification sent successfully for ${mention.id}.`,
+            );
           } catch (error) {
             console.error(
               `Failed to send open mention notification to token:`,
               error,
             );
           }
+        }
+
+        if (!notificationSent) {
+          console.error(
+            `No notification was successfully sent for mention ${mention.id}.`,
+          );
+
+          continue;
         }
 
         await setFirestoreDocumentFields(
@@ -975,6 +992,10 @@ export default {
         );
 
         console.log(`Mention ${mention.id} marked as open-notified.`);
+
+        console.log(
+          `Active tokens: ${activeTokens.length}, successful sends: ${notificationSent ? "yes" : "no"}`,
+        );
       }
 
       /*
