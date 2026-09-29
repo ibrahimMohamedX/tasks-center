@@ -11,6 +11,7 @@ import {
   createUser,
   updateUser,
   createTask,
+  deleteTask,
   calculateTaskStatus,
   convertFirebaseDate,
   getReadableFirebaseError,
@@ -491,8 +492,20 @@ function createAdminTask(task) {
       </div>
 
       <div class="status-column">
-        ${createStatusBadge(task.calculatedStatus)}
-      </div>
+  ${createStatusBadge(task.calculatedStatus)}
+</div>
+
+<div class="admin-task-actions">
+  <button
+    type="button"
+    class="task-delete-button"
+    data-delete-task="${escapeHtml(task.id)}"
+    title="Delete Task"
+  >
+    <i class="fa-solid fa-trash"></i>
+    Delete
+  </button>
+</div>
 
     </article>
   `;
@@ -764,6 +777,40 @@ async function handleCreateTask(event) {
       <i class="fa-solid fa-plus"></i>
       Create Task
     `;
+  }
+}
+
+async function handleDeleteTask(taskId) {
+  const task = state.tasks.find((item) => item.id === taskId);
+
+  if (!task) {
+    showToast("Task not found", "This task no longer exists.", "error");
+
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Are you sure you want to delete this task?\n\n"${task.title || "Untitled Task"}"\n\nThis action cannot be undone.`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await deleteTask(taskId);
+
+    showToast("Task deleted", "The task was deleted successfully.");
+
+    await loadData();
+  } catch (error) {
+    console.error("Delete task error:", error);
+
+    showToast(
+      "Unable to delete task",
+      getReadableFirebaseError(error),
+      "error",
+    );
   }
 }
 
@@ -1959,6 +2006,14 @@ function setupActions() {
   });
 
   document.addEventListener("click", (event) => {
+    const deleteTaskButton = event.target.closest("[data-delete-task]");
+
+    if (deleteTaskButton) {
+      handleDeleteTask(deleteTaskButton.dataset.deleteTask);
+
+      return;
+    }
+
     const deleteButton = event.target.closest("[data-delete-mention]");
 
     if (deleteButton) {

@@ -976,9 +976,31 @@ export async function updateTask(taskId, data = {}) {
 }
 
 export async function deleteTask(taskId) {
-  requireAuth();
+  const authUser = requireAuth();
 
-  await deleteDoc(doc(db, TASKS_COLLECTION, taskId));
+  if (!taskId) {
+    throw new Error("Task ID is required.");
+  }
+
+  const profile = await getUserById(authUser.uid);
+
+  if (!profile) {
+    throw new Error("تعذر العثور على المستخدم.");
+  }
+
+  if (profile.active === false || profile.role !== "admin") {
+    throw new Error("حذف المهام متاح للأدمن فقط.");
+  }
+
+  const taskRef = doc(db, TASKS_COLLECTION, taskId);
+
+  const taskSnapshot = await getDoc(taskRef);
+
+  if (!taskSnapshot.exists()) {
+    throw new Error("المهمة غير موجودة.");
+  }
+
+  await deleteDoc(taskRef);
 
   return true;
 }

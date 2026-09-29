@@ -980,6 +980,52 @@ button {
   font-size: 10px;
 }
 
+.admin-task-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.task-delete-button {
+  min-height: 32px;
+
+  padding: 0 10px;
+
+  border: 1px solid #fecaca;
+
+  background: #fff1f2;
+
+  color: #dc2626;
+
+  border-radius: 8px;
+
+  font-family: inherit;
+
+  font-size: 10px;
+
+  font-weight: 600;
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 5px;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+}
+
+.task-delete-button:hover {
+  background: #fee2e2;
+
+  border-color: #fca5a5;
+
+  color: #b91c1c;
+}
+
 .admin-task-info span {
   display: block;
 
@@ -1550,11 +1596,15 @@ tbody tr:last-child td {
   }
 
   .admin-task {
-    grid-template-columns: 1.5fr 1fr 1fr;
+    grid-template-columns: 1.5fr 1fr 1fr auto;
   }
 
   .admin-task .status-column {
     grid-column: 3;
+  }
+
+  .admin-task-actions {
+    grid-column: 4;
   }
 }
 
@@ -1661,6 +1711,10 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
 
     gap: 12px;
+  }
+
+  .admin-task-actions {
+    justify-content: flex-start;
   }
 
   .form-row {
