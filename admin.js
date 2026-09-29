@@ -17,7 +17,7 @@ import {
   getReadableFirebaseError,
   createMention,
   getMentions,
-  watchMentions,
+  // watchMentions,
   getMentionStatus,
   claimMention,
   completeMention,
@@ -45,7 +45,7 @@ const state = {
   taskFilter: "all",
   taskUserFilter: "all",
 
-  mentionUnsubscribe: null,
+  // mentionUnsubscribe: null,
   mentionCountdownInterval: null,
 
   loading: false,
@@ -962,23 +962,47 @@ async function handleEditUser(event) {
 // MENTIONS
 // ============================================================
 
+// async function initializeMentions() {
+//   try {
+//     // await loadMentionSettings();
+
+//     // await loadMentionAnalytics();
+
+//     if (state.mentionUnsubscribe) {
+//       state.mentionUnsubscribe();
+//     }
+
+//     state.mentionUnsubscribe = watchMentions((mentions) => {
+//       state.mentions = mentions;
+
+//       renderAdminMentions();
+//       renderMentionAnalytics();
+//       refreshMentionDetailsIfOpen();
+//     });
+//   } catch (error) {
+//     console.error("Mentions initialization error:", error);
+
+//     showToast("Mentions Error", getReadableFirebaseError(error), "error");
+//   }
+// }
+
 async function initializeMentions() {
   try {
-    // await loadMentionSettings();
+    const [mentions, settings] = await Promise.all([
+      getMentions(),
+      getMentionSettings(),
+    ]);
 
-    // await loadMentionAnalytics();
+    state.mentions = mentions;
 
-    if (state.mentionUnsubscribe) {
-      state.mentionUnsubscribe();
+    if (el.mentionLockDuration) {
+      el.mentionLockDuration.value = String(
+        settings.defaultLockDurationMinutes,
+      );
     }
 
-    state.mentionUnsubscribe = watchMentions((mentions) => {
-      state.mentions = mentions;
-
-      renderAdminMentions();
-      renderMentionAnalytics();
-      refreshMentionDetailsIfOpen();
-    });
+    renderAdminMentions();
+    renderMentionAnalytics();
   } catch (error) {
     console.error("Mentions initialization error:", error);
 
@@ -994,11 +1018,11 @@ async function loadMentionSettings() {
   }
 }
 
-async function loadMentionAnalytics() {
-  const analytics = await getMentionAnalytics();
+// async function loadMentionAnalytics() {
+//   const analytics = await getMentionAnalytics();
 
-  renderMentionAnalyticsData(analytics);
-}
+//   renderMentionAnalyticsData(analytics);
+// }
 
 function renderMentionAnalytics() {
   const mentions = state.mentions || [];
@@ -1051,8 +1075,6 @@ function renderMentionAnalytics() {
       ? mention.completedBy
       : [];
 
-    const queue = Array.isArray(mention.queue) ? mention.queue : [];
-
     stats.totalCompleted += completedBy.length;
 
     if (mention.createdBy) {
@@ -1088,39 +1110,17 @@ function renderMentionAnalytics() {
 
       userStats.get(entry.uid).completedCount++;
     });
+  });
 
-    queue.forEach((entry) => {
-      if (!entry.uid) {
-        return;
-      }
-
-      if (!userStats.has(entry.uid)) {
-        userStats.set(entry.uid, {
-          uid: entry.uid,
-          name: entry.name || "Unknown",
-          role: "unknown",
-          createdCount: 0,
-          completedCount: 0,
-          pendingCount: 0,
-        });
-      }
-
-      userStats.get(entry.uid).pendingCount++;
-    });
+  userStats.forEach((user) => {
+    user.pendingCount = Math.max(0, user.createdCount - user.completedCount);
   });
 
   renderMentionAnalyticsData({
     stats,
-    users: Array.from(userStats.values()).sort((a, b) => {
-      if (b.completedCount !== a.completedCount) {
-        return b.completedCount - a.completedCount;
-      }
-
-      return b.createdCount - a.createdCount;
-    }),
+    users: Array.from(userStats.values()),
   });
 }
-
 function renderMentionAnalyticsData(analytics) {
   const stats = analytics?.stats || {};
 
@@ -1844,10 +1844,20 @@ async function handleCreateMention(event) {
       submitButton.disabled = true;
     }
 
-    await createMention({
+    // await createMention({
+    //   url,
+    //   description,
+    // });
+
+    const createdMention = await createMention({
       url,
       description,
     });
+
+    state.mentions = [createdMention, ...state.mentions];
+
+    renderAdminMentions();
+    renderMentionAnalytics();
 
     el.mentionForm.reset();
 
@@ -1896,7 +1906,15 @@ async function handleMentionSettings(event) {
 
 async function handleClaimMention(mentionId) {
   try {
-    await claimMention(mentionId);
+    const updatedMention = await claimMention(mentionId);
+
+    state.mentions = state.mentions.map((mention) =>
+      mention.id === mentionId ? updatedMention : mention,
+    );
+
+    renderAdminMentions();
+    renderMentionAnalytics();
+    refreshMentionDetailsIfOpen();
 
     showToast("Mention claimed", "You can now execute this Mention.");
   } catch (error) {
@@ -1908,11 +1926,17 @@ async function handleClaimMention(mentionId) {
 
 async function handleCompleteMention(mentionId) {
   try {
-    await completeMention(mentionId);
+    const updatedMention = await completeMention(mentionId);
+
+    state.mentions = state.mentions.map((mention) =>
+      mention.id === mentionId ? updatedMention : mention,
+    );
+
+    renderAdminMentions();
+    renderMentionAnalytics();
+    refreshMentionDetailsIfOpen();
 
     showToast("Mention completed", "Your participation has been recorded.");
-
-    await loadMentionAnalytics();
   } catch (error) {
     console.error("Complete Mention error:", error);
 
@@ -1940,7 +1964,13 @@ async function handleDeleteMention(mentionId) {
 
     closeModal("mentionDetailsModal");
 
-    await loadMentionAnalytics();
+    // await loadMentionAnalytics();
+    state.mentions = state.mentions.filter(
+      (mention) => mention.id !== mentionId,
+    );
+
+    renderAdminMentions();
+    renderMentionAnalytics();
   } catch (error) {
     console.error("Delete Mention error:", error);
 
@@ -1977,14 +2007,15 @@ async function handleReactivateMention(mentionId, minutes) {
   }
 
   try {
-    await reactivateMention(mentionId, minutes);
+    const updatedMention = await reactivateMention(mentionId, minutes);
 
-    showToast(
-      "Mention reactivated",
-      `The Mention is available again for ${label}.`,
+    state.mentions = state.mentions.map((mention) =>
+      mention.id === mentionId ? updatedMention : mention,
     );
 
-    await loadMentionAnalytics();
+    renderAdminMentions();
+    renderMentionAnalytics();
+    refreshMentionDetailsIfOpen();
 
     closeModal("mentionDetailsModal");
   } catch (error) {

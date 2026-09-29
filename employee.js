@@ -14,7 +14,7 @@ import {
   convertFirebaseDate,
   getReadableFirebaseError,
   createMention,
-  watchMentions,
+  // watchMentions,
   getMentionStatus,
   claimMention,
   completeMention,
@@ -37,7 +37,7 @@ const state = {
 
   selectedTask: null,
 
-  mentionUnsubscribe: null,
+  // mentionUnsubscribe: null,
   mentionCountdownInterval: null,
 
   loading: false,
@@ -647,18 +647,33 @@ function setupFilters() {
 // EMPLOYEE MENTIONS
 // ============================================================
 
+// async function initializeEmployeeMentions() {
+//   try {
+//     if (state.mentionUnsubscribe) {
+//       state.mentionUnsubscribe();
+//     }
+
+//     state.mentionUnsubscribe = watchMentions((mentions) => {
+//       state.mentions = mentions;
+
+//       renderEmployeeMentions();
+//       refreshEmployeeMentionDetails();
+//     });
+//   } catch (error) {
+//     console.error("Employee Mentions initialization error:", error);
+
+//     showToast("Mentions Error", getReadableFirebaseError(error), "error");
+//   }
+// }
+
 async function initializeEmployeeMentions() {
   try {
-    if (state.mentionUnsubscribe) {
-      state.mentionUnsubscribe();
-    }
+    const mentions = await getMentions();
 
-    state.mentionUnsubscribe = watchMentions((mentions) => {
-      state.mentions = mentions;
+    state.mentions = mentions;
 
-      renderEmployeeMentions();
-      refreshEmployeeMentionDetails();
-    });
+    renderEmployeeMentions();
+    refreshEmployeeMentionDetails();
   } catch (error) {
     console.error("Employee Mentions initialization error:", error);
 

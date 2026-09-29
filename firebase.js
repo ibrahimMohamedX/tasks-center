@@ -42,6 +42,7 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   onSnapshot,
   serverTimestamp,
@@ -839,6 +840,8 @@ export async function createTask({
 
     assignedToName: employee.name || "",
 
+    assigneeIds: [employee.uid],
+
     status: "pending",
 
     assignees: [
@@ -1016,15 +1019,15 @@ export async function getTasksForUser(userId) {
     return [];
   }
 
-  const tasks = await getTasks();
+  const q = query(
+    collection(db, TASKS_COLLECTION),
+    where("assigneeIds", "array-contains", userId),
+    orderBy("createdAt", "desc"),
+  );
 
-  return tasks.filter((task) => {
-    if (Array.isArray(task.assignees)) {
-      return task.assignees.some((assignment) => assignment.uid === userId);
-    }
+  const snapshot = await getDocs(q);
 
-    return task.assignedTo === userId;
-  });
+  return snapshot.docs.map(normalizeTask);
 }
 
 export async function getMyTasks() {
