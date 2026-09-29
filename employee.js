@@ -15,6 +15,7 @@ import {
   getReadableFirebaseError,
   createMention,
   // watchMentions,
+  getMentions,
   getMentionStatus,
   claimMention,
   completeMention,
