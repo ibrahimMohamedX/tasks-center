@@ -1900,6 +1900,18 @@ tbody tr:last-child td {
   cursor: pointer;
 }
 
+.mention-action-danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+}
+
+.mention-action-danger:hover {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .mention-action-primary {
   background: #111827;
   color: #ffffff;

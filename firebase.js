@@ -1327,6 +1327,36 @@ export function watchMentions(callback) {
   );
 }
 
+export async function deleteMention(mentionId) {
+  const authUser = requireAuth();
+
+  if (!mentionId) {
+    throw new Error("Mention ID is required.");
+  }
+
+  const profile = await getUserById(authUser.uid);
+
+  if (!profile) {
+    throw new Error("تعذر العثور على المستخدم.");
+  }
+
+  if (profile.active === false || profile.role !== "admin") {
+    throw new Error("حذف الـMention متاح للأدمن فقط.");
+  }
+
+  const mentionRef = doc(db, MENTIONS_COLLECTION, mentionId);
+
+  const mentionSnapshot = await getDoc(mentionRef);
+
+  if (!mentionSnapshot.exists()) {
+    throw new Error("الـMention غير موجود.");
+  }
+
+  await deleteDoc(mentionRef);
+
+  return true;
+}
+
 export async function claimMention(mentionId) {
   const authUser = requireAuth();
 
@@ -1749,21 +1779,32 @@ export async function reactivateMention(mentionId, extraTimeMinutes) {
 // MENTION SETTINGS
 // ============================================================
 
+/**
+ * Retrieves mention settings from the database
+ * @returns {Object} An object containing mention settings with defaultLockDurationMinutes,
+ * updatedAt, and updatedBy properties
+ */
 export async function getMentionSettings() {
+  // Ensure user is authenticated before proceeding
   requireAuth();
 
+  // Create a reference to the mention settings document in the database
   const ref = doc(db, MENTION_SETTINGS_COLLECTION, MENTION_SETTINGS_DOCUMENT);
 
+  // Fetch the document snapshot from the database
   const snapshot = await getDoc(ref);
 
+  // If document doesn't exist, return default settings
   if (!snapshot.exists()) {
     return {
       defaultLockDurationMinutes: DEFAULT_MENTION_LOCK_DURATION_MINUTES,
     };
   }
 
+  // Extract data from the snapshot
   const data = snapshot.data();
 
+  // Return settings with proper type conversion and fallback values
   return {
     defaultLockDurationMinutes:
       Number(data.defaultLockDurationMinutes) ||

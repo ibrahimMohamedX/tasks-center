@@ -21,6 +21,7 @@ import {
   claimMention,
   completeMention,
   reactivateMention,
+  deleteMention,
   getMentionSettings,
   updateMentionSettings,
   getMentionAnalytics,
@@ -1220,17 +1221,27 @@ function createAdminMentionCard(mention) {
 
         <div class="mention-card-actions">
 
-          ${action}
+  ${action}
 
-          <button
-            type="button"
-            class="mention-action mention-action-secondary"
-            data-open-mention-details="${escapeHtml(mention.id)}"
-          >
-            Details
-          </button>
+  <button
+    type="button"
+    class="mention-action mention-action-secondary"
+    data-open-mention-details="${escapeHtml(mention.id)}"
+  >
+    Details
+  </button>
 
-        </div>
+  <button
+    type="button"
+    class="mention-action mention-action-danger"
+    data-delete-mention="${escapeHtml(mention.id)}"
+    title="Delete Mention"
+  >
+    <i class="fa-solid fa-trash"></i>
+    Delete
+  </button>
+
+</div>
 
       </div>
 
@@ -1751,6 +1762,34 @@ async function handleCompleteMention(mentionId) {
   }
 }
 
+async function handleDeleteMention(mentionId) {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this Mention?\n\nThis action cannot be undone.",
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await deleteMention(mentionId);
+
+    showToast("Mention deleted", "The Mention was deleted successfully.");
+
+    closeModal("mentionDetailsModal");
+
+    await loadMentionAnalytics();
+  } catch (error) {
+    console.error("Delete Mention error:", error);
+
+    showToast(
+      "Unable to delete Mention",
+      getReadableFirebaseError(error),
+      "error",
+    );
+  }
+}
+
 async function handleReactivateMention(mentionId, minutes) {
   const labels = {
     1: "1 minutes",
@@ -1920,6 +1959,13 @@ function setupActions() {
   });
 
   document.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest("[data-delete-mention]");
+
+    if (deleteButton) {
+      handleDeleteMention(deleteButton.dataset.deleteMention);
+
+      return;
+    }
     const completeButton = event.target.closest("[data-complete-mention]");
 
     if (completeButton) {
