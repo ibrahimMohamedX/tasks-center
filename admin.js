@@ -964,9 +964,9 @@ async function handleEditUser(event) {
 
 async function initializeMentions() {
   try {
-    await loadMentionSettings();
+    // await loadMentionSettings();
 
-    await loadMentionAnalytics();
+    // await loadMentionAnalytics();
 
     if (state.mentionUnsubscribe) {
       state.mentionUnsubscribe();
@@ -1001,8 +1001,123 @@ async function loadMentionAnalytics() {
 }
 
 function renderMentionAnalytics() {
-  loadMentionAnalytics().catch((error) => {
-    console.error("Mention analytics error:", error);
+  const mentions = state.mentions || [];
+  const users = state.users || [];
+
+  const stats = {
+    totalMentions: mentions.length,
+    activeMentions: 0,
+    openMentions: 0,
+    lockedMentions: 0,
+    expiredMentions: 0,
+    completedMentions: 0,
+    totalCreated: mentions.length,
+    totalCompleted: 0,
+  };
+
+  const userStats = new Map();
+
+  users.forEach((user) => {
+    userStats.set(user.uid, {
+      uid: user.uid,
+      name: user.name || "Unnamed",
+      role: user.role || "employee",
+      createdCount: 0,
+      completedCount: 0,
+      pendingCount: 0,
+    });
+  });
+
+  mentions.forEach((mention) => {
+    const status = getMentionStatus(mention);
+
+    if (status === "expired") {
+      stats.expiredMentions++;
+    } else if (status === "completed") {
+      stats.completedMentions++;
+    } else {
+      stats.activeMentions++;
+
+      if (status === "open") {
+        stats.openMentions++;
+      }
+
+      if (status === "locked") {
+        stats.lockedMentions++;
+      }
+    }
+
+    const completedBy = Array.isArray(mention.completedBy)
+      ? mention.completedBy
+      : [];
+
+    const queue = Array.isArray(mention.queue) ? mention.queue : [];
+
+    stats.totalCompleted += completedBy.length;
+
+    if (mention.createdBy) {
+      if (!userStats.has(mention.createdBy)) {
+        userStats.set(mention.createdBy, {
+          uid: mention.createdBy,
+          name: mention.createdByName || "Unknown",
+          role: "unknown",
+          createdCount: 0,
+          completedCount: 0,
+          pendingCount: 0,
+        });
+      }
+
+      userStats.get(mention.createdBy).createdCount++;
+    }
+
+    completedBy.forEach((entry) => {
+      if (!entry.uid) {
+        return;
+      }
+
+      if (!userStats.has(entry.uid)) {
+        userStats.set(entry.uid, {
+          uid: entry.uid,
+          name: entry.name || "Unknown",
+          role: "unknown",
+          createdCount: 0,
+          completedCount: 0,
+          pendingCount: 0,
+        });
+      }
+
+      userStats.get(entry.uid).completedCount++;
+    });
+
+    queue.forEach((entry) => {
+      if (!entry.uid) {
+        return;
+      }
+
+      if (!userStats.has(entry.uid)) {
+        userStats.set(entry.uid, {
+          uid: entry.uid,
+          name: entry.name || "Unknown",
+          role: "unknown",
+          createdCount: 0,
+          completedCount: 0,
+          pendingCount: 0,
+        });
+      }
+
+      userStats.get(entry.uid).pendingCount++;
+    });
+  });
+
+  renderMentionAnalyticsData({
+    stats,
+    users: Array.from(userStats.values()).sort((a, b) => {
+      if (b.completedCount !== a.completedCount) {
+        return b.completedCount - a.completedCount;
+      }
+
+      return b.createdCount - a.createdCount;
+    }),
   });
 }
 
@@ -1740,7 +1855,7 @@ async function handleCreateMention(event) {
 
     showToast("Mention created", "The Mention was created successfully.");
 
-    await loadMentionAnalytics();
+    // await loadMentionAnalytics();
   } catch (error) {
     console.error("Create mention error:", error);
 
