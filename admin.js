@@ -7,12 +7,8 @@ import {
   logoutUser,
   getUser,
   getUsers,
-  getAllTasks,
   createUser,
   updateUser,
-  createTask,
-  deleteTask,
-  calculateTaskStatus,
   convertFirebaseDate,
   getReadableFirebaseError,
   createMention,
@@ -25,7 +21,6 @@ import {
   deleteMention,
   getMentionSettings,
   updateMentionSettings,
-  getMentionAnalytics,
   registerPushNotifications,
   listenForForegroundNotifications,
 } from "./firebase.js";
@@ -39,11 +34,7 @@ const state = {
   profile: null,
 
   users: [],
-  tasks: [],
   mentions: [],
-
-  taskFilter: "all",
-  taskUserFilter: "all",
 
   // mentionUnsubscribe: null,
   mentionCountdownInterval: null,
@@ -62,41 +53,15 @@ const el = {
 
   userAvatar: document.getElementById("userAvatar"),
 
-  totalTasks: document.getElementById("totalTasks"),
-
-  pendingTasks: document.getElementById("pendingTasks"),
-
-  completedTasks: document.getElementById("completedTasks"),
-
-  expiredTasks: document.getElementById("expiredTasks"),
-
-  recentTasks: document.getElementById("recentTasks"),
-
-  teamOverview: document.getElementById("teamOverview"),
-
-  adminTasks: document.getElementById("adminTasks"),
-
   usersTableBody: document.getElementById("usersTableBody"),
-
-  taskUserFilter: document.getElementById("taskUserFilter"),
-
-  assignedTo: document.getElementById("assignedTo"),
-
-  taskForm: document.getElementById("taskForm"),
 
   userForm: document.getElementById("userForm"),
 
   editUserForm: document.getElementById("editUserForm"),
 
-  taskModal: document.getElementById("taskModal"),
-
   userModal: document.getElementById("userModal"),
 
   editUserModal: document.getElementById("editUserModal"),
-
-  addTaskButton: document.getElementById("addTaskButton"),
-
-  dashboardAddTaskButton: document.getElementById("dashboardAddTaskButton"),
 
   addUserButton: document.getElementById("addUserButton"),
 
@@ -149,7 +114,6 @@ document.addEventListener("DOMContentLoaded", initialize);
 function initialize() {
   setupNavigation();
   setupMobileSidebar();
-  setupFilters();
   setupModals();
   setupActions();
 
@@ -255,20 +219,11 @@ async function loadData() {
   try {
     setLoading(true);
 
-    const [users, tasks] = await Promise.all([getUsers(), getAllTasks()]);
+    const users = await getUsers();
 
     state.users = users;
 
-    state.tasks = tasks.map((task) => ({
-      ...task,
-
-      calculatedStatus: calculateTaskStatus(task),
-    }));
-
-    renderDashboard();
-    renderTasks();
     renderUsers();
-    populateUserSelects();
   } catch (error) {
     console.error("Load admin data error:", error);
 
@@ -282,234 +237,7 @@ async function loadData() {
 // DASHBOARD
 // ============================================================
 
-function renderDashboard() {
-  const counts = getTaskCounts();
 
-  el.totalTasks.textContent = counts.total;
-
-  el.pendingTasks.textContent = counts.pending;
-
-  el.completedTasks.textContent = counts.completed;
-
-  el.expiredTasks.textContent = counts.expired;
-
-  renderRecentTasks();
-  renderTeamOverview();
-}
-
-function getTaskCounts() {
-  const counts = {
-    total: state.tasks.length,
-    pending: 0,
-    completed: 0,
-    expired: 0,
-  };
-
-  state.tasks.forEach((task) => {
-    if (task.calculatedStatus === "completed") {
-      counts.completed++;
-    } else if (task.calculatedStatus === "expired") {
-      counts.expired++;
-    } else {
-      counts.pending++;
-    }
-  });
-
-  return counts;
-}
-
-// ============================================================
-// RECENT TASKS
-// ============================================================
-
-function renderRecentTasks() {
-  const tasks = [...state.tasks]
-    .sort((a, b) => getDateValue(b.createdAt) - getDateValue(a.createdAt))
-    .slice(0, 7);
-
-  if (!tasks.length) {
-    el.recentTasks.innerHTML = createEmptyState(
-      "No tasks",
-      "No tasks have been created yet.",
-    );
-
-    return;
-  }
-
-  el.recentTasks.innerHTML = tasks.map(createTaskRow).join("");
-}
-
-function createTaskRow(task) {
-  const assignedUser = getUserById(task.assignedTo);
-
-  return `
-    <div class="task-row">
-
-      <div class="task-main">
-
-        <div class="task-title">
-          ${escapeHtml(task.title || "Untitled Task")}
-        </div>
-
-        <div class="task-meta">
-
-          <span>
-            <i class="fa-solid fa-user"></i>
-            ${escapeHtml(
-              assignedUser?.name || task.assignedToName || "Unassigned",
-            )}
-          </span>
-
-          <span>
-            <i class="fa-regular fa-calendar"></i>
-            ${formatDateTime(task.scheduledAt)}
-          </span>
-
-        </div>
-
-      </div>
-
-      <div class="task-side">
-        ${createStatusBadge(task.calculatedStatus)}
-      </div>
-
-    </div>
-  `;
-}
-
-// ============================================================
-// TEAM
-// ============================================================
-
-function renderTeamOverview() {
-  const users = state.users.filter((user) => user.active !== false).slice(0, 8);
-
-  if (!users.length) {
-    el.teamOverview.innerHTML = createEmptyState(
-      "No users",
-      "No team members found.",
-    );
-
-    return;
-  }
-
-  el.teamOverview.innerHTML = users
-    .map((user) => {
-      const taskCount = state.tasks.filter(
-        (task) => task.assignedTo === user.id,
-      ).length;
-
-      return `
-          <div class="team-user">
-
-            <div class="team-avatar">
-              ${getInitials(user.name)}
-            </div>
-
-            <div class="team-user-info">
-
-              <strong>
-                ${escapeHtml(user.name || "Unnamed")}
-              </strong>
-
-              <span>
-                ${user.role === "admin" ? "Administrator" : "Employee"}
-              </span>
-
-            </div>
-
-            <span class="status-badge ${
-              user.role === "admin" ? "admin" : "employee"
-            }">
-              ${taskCount} tasks
-            </span>
-
-          </div>
-        `;
-    })
-    .join("");
-}
-
-// ============================================================
-// TASKS
-// ============================================================
-
-function renderTasks() {
-  let tasks = [...state.tasks];
-
-  if (state.taskFilter !== "all") {
-    tasks = tasks.filter((task) => task.calculatedStatus === state.taskFilter);
-  }
-
-  if (state.taskUserFilter !== "all") {
-    tasks = tasks.filter((task) => task.assignedTo === state.taskUserFilter);
-  }
-
-  tasks.sort((a, b) => getDateValue(b.createdAt) - getDateValue(a.createdAt));
-
-  if (!tasks.length) {
-    el.adminTasks.innerHTML = createEmptyState(
-      "No tasks found",
-      "There are no tasks matching the current filters.",
-    );
-
-    return;
-  }
-
-  el.adminTasks.innerHTML = tasks.map(createAdminTask).join("");
-}
-
-function createAdminTask(task) {
-  const assignedUser = getUserById(task.assignedTo);
-
-  return `
-    <article class="admin-task">
-
-      <div>
-
-        <div class="admin-task-title">
-          ${escapeHtml(task.title || "Untitled Task")}
-        </div>
-
-      </div>
-
-      <div class="admin-task-info">
-        <span>Assigned To</span>
-
-        ${escapeHtml(assignedUser?.name || task.assignedToName || "Unassigned")}
-      </div>
-
-      <div class="admin-task-info">
-        <span>Scheduled</span>
-
-        ${formatDateTime(task.scheduledAt)}
-      </div>
-
-      <div class="admin-task-info">
-        <span>Deadline</span>
-
-        ${formatDateTime(task.deadline)}
-      </div>
-
-      <div class="status-column">
-  ${createStatusBadge(task.calculatedStatus)}
-</div>
-
-<div class="admin-task-actions">
-  <button
-    type="button"
-    class="task-delete-button"
-    data-delete-task="${escapeHtml(task.id)}"
-    title="Delete Task"
-  >
-    <i class="fa-solid fa-trash"></i>
-    Delete
-  </button>
-</div>
-
-    </article>
-  `;
-}
 
 // ============================================================
 // USERS
@@ -535,10 +263,6 @@ function renderUsers() {
 }
 
 function createUserRow(user) {
-  const taskCount = state.tasks.filter(
-    (task) => task.assignedTo === user.id,
-  ).length;
-
   const visible = user.showTasks !== false && user.receiveTasks !== false;
 
   const active = user.active !== false;
@@ -576,10 +300,6 @@ function createUserRow(user) {
         }">
           ${user.role === "admin" ? "Admin" : "Employee"}
         </span>
-      </td>
-
-      <td>
-        ${taskCount}
       </td>
 
       <td>
@@ -626,192 +346,6 @@ function createUserRow(user) {
 
     </tr>
   `;
-}
-
-// ============================================================
-// SELECTS
-// ============================================================
-
-function populateUserSelects() {
-  const employees = state.users.filter(
-    (user) => user.role === "employee" && user.active !== false,
-  );
-
-  el.assignedTo.innerHTML = `
-    <option value="">
-      Select employee
-    </option>
-
-    ${employees
-      .map(
-        (user) => `
-          <option value="${user.id}">
-            ${escapeHtml(user.name)}
-          </option>
-        `,
-      )
-      .join("")}
-  `;
-
-  el.taskUserFilter.innerHTML = `
-    <option value="all">
-      All Users
-    </option>
-
-    ${state.users
-      .map(
-        (user) => `
-          <option value="${user.id}">
-            ${escapeHtml(user.name)}
-          </option>
-        `,
-      )
-      .join("")}
-  `;
-
-  el.taskUserFilter.value = state.taskUserFilter;
-}
-
-// ============================================================
-// CREATE TASK
-// ============================================================
-
-async function handleCreateTask(event) {
-  event.preventDefault();
-
-  const title = document.getElementById("taskTitle").value.trim();
-
-  const description = document.getElementById("taskDescription").value.trim();
-
-  const link = document.getElementById("taskLink").value.trim();
-
-  const assignedTo = el.assignedTo.value;
-
-  const scheduledValue = document.getElementById("scheduledAt").value;
-
-  const deadlineValue = document.getElementById("deadline").value;
-
-  if (!title) {
-    showToast("Missing title", "Please enter a task title.", "error");
-
-    return;
-  }
-
-  if (!assignedTo) {
-    showToast("Missing employee", "Please select an employee.", "error");
-
-    return;
-  }
-
-  const scheduledAt = new Date(scheduledValue);
-
-  const deadline = new Date(deadlineValue);
-
-  if (Number.isNaN(scheduledAt.getTime()) || Number.isNaN(deadline.getTime())) {
-    showToast("Invalid date", "Please enter valid dates.", "error");
-
-    return;
-  }
-
-  if (scheduledAt <= new Date()) {
-    showToast(
-      "Invalid schedule",
-      "Scheduled time must be in the future.",
-      "error",
-    );
-
-    return;
-  }
-
-  if (deadline <= scheduledAt) {
-    showToast(
-      "Invalid deadline",
-      "Deadline must be after the scheduled time.",
-      "error",
-    );
-
-    return;
-  }
-
-  const submitButton = el.taskForm.querySelector('button[type="submit"]');
-
-  try {
-    submitButton.disabled = true;
-
-    submitButton.innerHTML = `
-      <span class="spinner"></span>
-      Creating...
-    `;
-
-    await createTask({
-      title,
-      description,
-      link,
-
-      createdBy: state.authUser.uid,
-
-      assignedTo,
-      scheduledAt,
-      deadline,
-    });
-
-    closeModal("taskModal");
-
-    el.taskForm.reset();
-
-    showToast("Task created", "The task has been assigned successfully.");
-
-    await loadData();
-  } catch (error) {
-    console.error("Create task error:", error);
-
-    showToast(
-      "Unable to create task",
-      getReadableFirebaseError(error),
-      "error",
-    );
-  } finally {
-    submitButton.disabled = false;
-
-    submitButton.innerHTML = `
-      <i class="fa-solid fa-plus"></i>
-      Create Task
-    `;
-  }
-}
-
-async function handleDeleteTask(taskId) {
-  const task = state.tasks.find((item) => item.id === taskId);
-
-  if (!task) {
-    showToast("Task not found", "This task no longer exists.", "error");
-
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Are you sure you want to delete this task?\n\n"${task.title || "Untitled Task"}"\n\nThis action cannot be undone.`,
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    await deleteTask(taskId);
-
-    showToast("Task deleted", "The task was deleted successfully.");
-
-    await loadData();
-  } catch (error) {
-    console.error("Delete task error:", error);
-
-    showToast(
-      "Unable to delete task",
-      getReadableFirebaseError(error),
-      "error",
-    );
-  }
 }
 
 // ============================================================
@@ -883,7 +417,9 @@ async function handleCreateUser(event) {
 // ============================================================
 
 function openEditUser(userId) {
-  const user = getUserById(userId);
+  const user =
+    state.users.find((item) => item.id === userId || item.uid === userId) ||
+    null;
 
   if (!user) {
     return;
@@ -962,30 +498,6 @@ async function handleEditUser(event) {
 // MENTIONS
 // ============================================================
 
-// async function initializeMentions() {
-//   try {
-//     // await loadMentionSettings();
-
-//     // await loadMentionAnalytics();
-
-//     if (state.mentionUnsubscribe) {
-//       state.mentionUnsubscribe();
-//     }
-
-//     state.mentionUnsubscribe = watchMentions((mentions) => {
-//       state.mentions = mentions;
-
-//       renderAdminMentions();
-//       renderMentionAnalytics();
-//       refreshMentionDetailsIfOpen();
-//     });
-//   } catch (error) {
-//     console.error("Mentions initialization error:", error);
-
-//     showToast("Mentions Error", getReadableFirebaseError(error), "error");
-//   }
-// }
-
 async function initializeMentions() {
   try {
     const [mentions, settings] = await Promise.all([
@@ -1009,20 +521,6 @@ async function initializeMentions() {
     showToast("Mentions Error", getReadableFirebaseError(error), "error");
   }
 }
-
-async function loadMentionSettings() {
-  const settings = await getMentionSettings();
-
-  if (el.mentionLockDuration) {
-    el.mentionLockDuration.value = String(settings.defaultLockDurationMinutes);
-  }
-}
-
-// async function loadMentionAnalytics() {
-//   const analytics = await getMentionAnalytics();
-
-//   renderMentionAnalyticsData(analytics);
-// }
 
 function renderMentionAnalytics() {
   const mentions = state.mentions || [];
@@ -1484,6 +982,19 @@ function getMentionCountdownText(mention) {
   return `Opens in ${formatDuration(diff)}`;
 }
 
+function formatDateTime(value) {
+  const date = convertFirebaseDate(value);
+
+  if (!date) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 function formatDuration(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
 
@@ -1583,6 +1094,8 @@ function openMentionDetails(mentionId, openModalAfter = true) {
   const mention = state.mentions.find((item) => item.id === mentionId);
 
   if (!mention) {
+    showToast("Mention not found", "This Mention no longer exists.", "error");
+
     return;
   }
 
@@ -1865,7 +1378,6 @@ async function handleCreateMention(event) {
 
     showToast("Mention created", "The Mention was created successfully.");
 
-    // await loadMentionAnalytics();
   } catch (error) {
     console.error("Create mention error:", error);
 
@@ -1964,7 +1476,6 @@ async function handleDeleteMention(mentionId) {
 
     closeModal("mentionDetailsModal");
 
-    // await loadMentionAnalytics();
     state.mentions = state.mentions.filter(
       (mention) => mention.id !== mentionId,
     );
@@ -2080,42 +1591,10 @@ function showSection(section) {
 }
 
 // ============================================================
-// FILTERS
-// ============================================================
-
-function setupFilters() {
-  document.querySelectorAll(".filter-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      document
-        .querySelectorAll(".filter-button")
-        .forEach((item) => item.classList.remove("active"));
-
-      button.classList.add("active");
-
-      state.taskFilter = button.dataset.filter;
-
-      renderTasks();
-    });
-  });
-
-  el.taskUserFilter.addEventListener("change", () => {
-    state.taskUserFilter = el.taskUserFilter.value;
-
-    renderTasks();
-  });
-}
-
-// ============================================================
 // ACTIONS
 // ============================================================
 
 function setupActions() {
-  el.addTaskButton?.addEventListener("click", () => openModal("taskModal"));
-
-  el.dashboardAddTaskButton?.addEventListener("click", () =>
-    openModal("taskModal"),
-  );
-
   el.addUserButton?.addEventListener("click", () => openModal("userModal"));
 
   el.refreshButton?.addEventListener("click", loadData);
@@ -2128,8 +1607,6 @@ function setupActions() {
       console.error("Logout error:", error);
     }
   });
-
-  el.taskForm?.addEventListener("submit", handleCreateTask);
 
   el.userForm?.addEventListener("submit", handleCreateUser);
 
@@ -2152,14 +1629,6 @@ function setupActions() {
   });
 
   document.addEventListener("click", (event) => {
-    const deleteTaskButton = event.target.closest("[data-delete-task]");
-
-    if (deleteTaskButton) {
-      handleDeleteTask(deleteTaskButton.dataset.deleteTask);
-
-      return;
-    }
-
     const deleteButton = event.target.closest("[data-delete-mention]");
 
     if (deleteButton) {
@@ -2167,6 +1636,7 @@ function setupActions() {
 
       return;
     }
+
     const completeButton = event.target.closest("[data-complete-mention]");
 
     if (completeButton) {
@@ -2293,24 +1763,6 @@ function hideToast() {
 // HELPERS
 // ============================================================
 
-function getUserById(userId) {
-  return state.users.find((user) => user.id === userId || user.uid === userId);
-}
-
-function createStatusBadge(status) {
-  const labels = {
-    pending: "Pending",
-    completed: "Completed",
-    expired: "Expired",
-  };
-
-  return `
-    <span class="status-badge ${status}">
-      ${labels[status] || "Unknown"}
-    </span>
-  `;
-}
-
 function createEmptyState(title, message) {
   return `
     <div class="empty-state">
@@ -2329,25 +1781,6 @@ function createEmptyState(title, message) {
 
     </div>
   `;
-}
-
-function getDateValue(value) {
-  const date = convertFirebaseDate(value);
-
-  return date ? date.getTime() : 0;
-}
-
-function formatDateTime(value) {
-  const date = convertFirebaseDate(value);
-
-  if (!date) {
-    return "—";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }
 
 function getInitials(name) {
@@ -2438,41 +1871,6 @@ async function setupPushNotifications() {
     console.error("Push notification setup failed:", error);
   }
 }
-// async function setupPushNotifications() {
-//   if (!("serviceWorker" in navigator)) {
-//     console.log("FCM: Service Worker is not supported.");
-//     return;
-//   }
-
-//   try {
-//     console.log("FCM: Registering service worker...");
-
-//     const registration = await navigator.serviceWorker.register(
-//       "./firebase-messaging-sw.js",
-//     );
-
-//     console.log("FCM: Service worker registered:", registration);
-
-//     console.log(
-//       "FCM: Current notification permission:",
-//       Notification.permission,
-//     );
-
-//     const token = await registerPushNotifications();
-
-//     console.log("FCM: Registration result:", token);
-
-//     await listenForForegroundNotifications((payload) => {
-//       console.log("FCM: Foreground notification:", payload);
-
-//       showNotificationToast(payload);
-//     });
-
-//     console.log("FCM: Foreground listener ready.");
-//   } catch (error) {
-//     console.error("FCM: Push notification setup failed:", error);
-//   }
-// }
 function showNotificationToast(payload) {
   const notification = payload.notification || {};
 

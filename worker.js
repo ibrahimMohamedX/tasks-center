@@ -421,20 +421,6 @@ async function setFirestoreDocumentFields(
 
   return data;
 }
-async function markNotificationSent(
-  accessToken,
-  projectId,
-  collectionName,
-  documentId,
-) {
-  const documentPath = `${collectionName}/${documentId}`;
-
-  await setFirestoreDocumentFields(accessToken, projectId, documentPath, {
-    notificationSentAt: {
-      timestampValue: new Date().toISOString(),
-    },
-  });
-}
 function getFirestoreTimestampValue(fields, fieldName) {
   const field = fields?.[fieldName];
 
@@ -734,94 +720,17 @@ export default {
         console.log("Last processed:", lastProcessedAt);
       }
 
-      const [taskDocuments, mentionDocuments, activeTokens] = await Promise.all(
+      const [mentionDocuments, activeTokens] = await Promise.all(
         [
-          getNewDocuments(accessToken, projectId, "tasks", lastProcessedAt),
-
           getNewDocuments(accessToken, projectId, "mentions", lastProcessedAt),
 
           getActiveFcmTokens(accessToken, projectId),
         ],
       );
 
-      console.log(`Found ${taskDocuments.length} new task(s).`);
-
-      console.log(`Found ${activeTokens.length} active FCM token(s).`);
-
       console.log(`Found ${mentionDocuments.length} new mention(s).`);
 
-      /*
-       * --------------------------------------------------
-       * TASK NOTIFICATIONS
-       * --------------------------------------------------
-       */
-
-      for (const document of taskDocuments) {
-        const task = firestoreDocumentToObject(document);
-
-        const alreadySent = document.fields?.notificationSentAt;
-
-        if (alreadySent) {
-          console.log(`Skipping task ${task.id} - notification already sent.`);
-
-          continue;
-        }
-
-        const taskTitle = task.title || task.name || "New Task";
-
-        const taskDescription = task.description || "";
-
-        const title = "New Task 📋";
-
-        const body = taskDescription
-          ? `${taskTitle} — ${taskDescription}`
-          : taskTitle;
-
-        console.log(`Sending task notification: ${task.id}`);
-
-        // const tokenDocuments = await getFirestoreDocuments(
-        //   accessToken,
-        //   projectId,
-        //   "fcmTokens",
-        // );
-
-        // const activeTokens = tokenDocuments
-        //   .map((tokenDocument) => {
-        //     const fields = tokenDocument.fields || {};
-
-        //     return {
-        //       token: getFirestoreFieldValue(fields, "token"),
-
-        //       active: getFirestoreFieldValue(fields, "active"),
-        //     };
-        //   })
-        //   .filter((item) => item.active === true && item.token);
-
-        for (const target of activeTokens) {
-          try {
-            await sendFcmNotification({
-              accessToken,
-              projectId,
-              token: target.token,
-
-              title,
-
-              body,
-
-              data: {
-                type: "task_created",
-                taskId: task.id,
-              },
-            });
-          } catch (error) {
-            console.error(`Failed to send task notification to token:`, error);
-          }
-        }
-
-        await markNotificationSent(accessToken, projectId, "tasks", task.id);
-
-        console.log(`Task ${task.id} marked as notified.`);
-      }
+      console.log(`Found ${activeTokens.length} active FCM token(s).`);
 
       /*
        * --------------------------------------------------

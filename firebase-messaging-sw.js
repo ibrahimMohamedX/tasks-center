@@ -30,10 +30,6 @@ self.addEventListener("notificationclick", (event) => {
 
   let url = "/";
 
-  if (data.taskId) {
-    url = `/admin.html?task=${encodeURIComponent(data.taskId)}`;
-  }
-
   if (data.mentionId) {
     url = `/admin.html?mention=${encodeURIComponent(data.mentionId)}`;
   }

@@ -55,11 +55,6 @@
             <span>Dashboard</span>
           </button>
 
-          <button class="nav-item" data-section="tasks">
-            <i class="fa-solid fa-list-check"></i>
-            <span>Tasks</span>
-          </button>
-
           <button class="nav-item" data-section="users">
             <i class="fa-solid fa-users"></i>
             <span>Users</span>
@@ -126,163 +121,8 @@
                 <h1>Dashboard</h1>
 
                 <p class="page-description">
-                  Monitor users, tasks and activity.
+                  Monitor users and activity.
                 </p>
-              </div>
-
-              <button class="primary-button" id="dashboardAddTaskButton">
-                <i class="fa-solid fa-plus"></i>
-                Add Task
-              </button>
-            </div>
-
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-icon total">
-                  <i class="fa-solid fa-list-check"></i>
-                </div>
-
-                <div class="stat-content">
-                  <span> Total Tasks </span>
-
-                  <strong id="totalTasks"> 0 </strong>
-                </div>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-icon pending">
-                  <i class="fa-regular fa-clock"></i>
-                </div>
-
-                <div class="stat-content">
-                  <span> Pending </span>
-
-                  <strong id="pendingTasks"> 0 </strong>
-                </div>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-icon completed">
-                  <i class="fa-solid fa-check"></i>
-                </div>
-
-                <div class="stat-content">
-                  <span> Completed </span>
-
-                  <strong id="completedTasks"> 0 </strong>
-                </div>
-              </div>
-
-              <div class="stat-card">
-                <div class="stat-icon expired">
-                  <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-
-                <div class="stat-content">
-                  <span> Expired </span>
-
-                  <strong id="expiredTasks"> 0 </strong>
-                </div>
-              </div>
-            </div>
-
-            <div class="dashboard-grid">
-              <div class="section-card">
-                <div class="section-card-header">
-                  <div>
-                    <h2>Recent Tasks</h2>
-
-                    <p>Latest task activity.</p>
-                  </div>
-
-                  <button class="text-button" data-section-link="tasks">
-                    View all
-                    <i class="fa-solid fa-arrow-right"></i>
-                  </button>
-                </div>
-
-                <div class="task-list" id="recentTasks">
-                  <div class="loading-state">
-                    <div class="spinner"></div>
-
-                    <span> Loading... </span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="section-card">
-                <div class="section-card-header">
-                  <div>
-                    <h2>Team Overview</h2>
-
-                    <p>Current team members.</p>
-                  </div>
-
-                  <button class="text-button" data-section-link="users">
-                    View all
-                  </button>
-                </div>
-
-                <div class="team-list" id="teamOverview">
-                  <div class="loading-state">
-                    <div class="spinner"></div>
-
-                    <span> Loading... </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- =================================================
-                 TASKS
-            ================================================== -->
-
-          <section class="page-section" id="tasksSection">
-            <div class="page-header">
-              <div>
-                <p class="eyebrow">Management</p>
-
-                <h1>Tasks</h1>
-
-                <p class="page-description">Manage and monitor all tasks.</p>
-              </div>
-
-              <button class="primary-button" id="addTaskButton">
-                <i class="fa-solid fa-plus"></i>
-                Add Task
-              </button>
-            </div>
-
-            <div class="toolbar">
-              <div class="filters">
-                <button class="filter-button active" data-filter="all">
-                  All
-                </button>
-
-                <button class="filter-button" data-filter="pending">
-                  Pending
-                </button>
-
-                <button class="filter-button" data-filter="completed">
-                  Completed
-                </button>
-
-                <button class="filter-button" data-filter="expired">
-                  Expired
-                </button>
-              </div>
-
-              <select id="taskUserFilter" class="select-input">
-                <option value="all">All Users</option>
-              </select>
-            </div>
-
-            <div class="admin-task-list" id="adminTasks">
-              <div class="loading-state">
-                <div class="spinner"></div>
-
-                <span> Loading tasks... </span>
               </div>
             </div>
           </section>
@@ -489,8 +329,6 @@
 
                       <th>Role</th>
 
-                      <th>Tasks</th>
-
                       <th>Task Visibility</th>
 
                       <th>Status</th>
@@ -501,7 +339,7 @@
 
                   <tbody id="usersTableBody">
                     <tr>
-                      <td colspan="6" class="table-loading">
+                      <td colspan="5" class="table-loading">
                         <div class="spinner"></div>
 
                         Loading users...
@@ -518,7 +356,7 @@
 
     <!-- =========================================================
      CREATE MENTION MODAL
-========================================================== -->
+========================================================= -->
     <div class="modal-overlay" id="mentionModal">
       <div class="modal">
         <div class="modal-header">
@@ -574,7 +412,7 @@
 
     <!-- =========================================================
      MENTION DETAILS MODAL
-========================================================== -->
+========================================================= -->
     <div class="modal-overlay" id="mentionDetailsModal">
       <div class="modal modal-large">
         <div class="modal-header">
@@ -595,94 +433,8 @@
     </div>
 
     <!-- =========================================================
-     ADD TASK MODAL
-========================================================== -->
-
-    <div class="modal-overlay" id="taskModal">
-      <div class="modal">
-        <div class="modal-header">
-          <div>
-            <span class="modal-label"> Task Management </span>
-
-            <h2>Add New Task</h2>
-          </div>
-
-          <button class="modal-close" data-close-modal="taskModal">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-
-        <form id="taskForm" class="modal-body">
-          <div class="form-group">
-            <label for="taskTitle"> Task Title </label>
-
-            <input
-              id="taskTitle"
-              type="text"
-              placeholder="Enter task title"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="taskDescription"> Description </label>
-
-            <textarea
-              id="taskDescription"
-              rows="3"
-              placeholder="Optional description"
-            ></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="taskLink"> Task Link </label>
-
-            <input id="taskLink" type="url" placeholder="https://..." />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="assignedTo"> Assign To </label>
-
-              <select id="assignedTo" required>
-                <option value="">Select employee</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="scheduledAt"> Scheduled </label>
-
-              <input id="scheduledAt" type="datetime-local" required />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="deadline"> Deadline </label>
-
-            <input id="deadline" type="datetime-local" required />
-          </div>
-
-          <div class="modal-form-footer">
-            <button
-              type="button"
-              class="secondary-button"
-              data-close-modal="taskModal"
-            >
-              Cancel
-            </button>
-
-            <button type="submit" class="primary-button">
-              <i class="fa-solid fa-plus"></i>
-              Create Task
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- =========================================================
      ADD USER MODAL
-========================================================== -->
+========================================================= -->
 
     <div class="modal-overlay" id="userModal">
       <div class="modal">
@@ -775,7 +527,7 @@
 
     <!-- =========================================================
      EDIT USER MODAL
-========================================================== -->
+========================================================= -->
 
     <div class="modal-overlay" id="editUserModal">
       <div class="modal">
@@ -852,7 +604,7 @@
 
     <!-- =========================================================
      TOAST
-========================================================== -->
+========================================================= -->
 
     <div class="toast" id="toast">
       <div class="toast-icon">

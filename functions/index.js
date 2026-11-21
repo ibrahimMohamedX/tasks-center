@@ -47,7 +47,6 @@ async function createAndSendNotification({
   type,
   title,
   message,
-  taskId = null,
   mentionId = null,
   createdBy = null,
   createdByName = null,
@@ -67,7 +66,6 @@ async function createAndSendNotification({
     type,
     title,
     message,
-    taskId,
     mentionId,
     createdBy,
     createdByName,
@@ -92,7 +90,6 @@ async function createAndSendNotification({
 
     data: {
       type,
-      taskId: taskId || "",
       mentionId: mentionId || "",
     },
 
@@ -107,9 +104,7 @@ async function createAndSendNotification({
       fcmOptions: {
         link: mentionId
           ? `/employee.html?mention=${mentionId}`
-          : taskId
-            ? `/employee.html?task=${taskId}`
-            : "/",
+          : "/",
       },
     },
   });
@@ -145,37 +140,6 @@ async function createAndSendNotification({
     await batch.commit();
   }
 }
-
-/* ============================================================
-   TASK CREATED
-   ============================================================ */
-
-exports.notifyTaskCreated = onDocumentCreated(
-  "tasks/{taskId}",
-  async (event) => {
-    const snapshot = event.data;
-
-    if (!snapshot) {
-      return;
-    }
-
-    const task = snapshot.data();
-
-    await createAndSendNotification({
-      type: "task_created",
-
-      title: "New Task",
-
-      message: `${task.createdByName || "Someone"} ` + "created a new task.",
-
-      taskId: snapshot.id,
-
-      createdBy: task.createdBy || null,
-
-      createdByName: task.createdByName || null,
-    });
-  },
-);
 
 /* ============================================================
    MENTION CREATED
